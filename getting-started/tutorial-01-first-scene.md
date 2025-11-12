@@ -138,6 +138,9 @@ Now you need to tell the mesh component which mesh to display:
 1. **Expand the component** - In the Properties panel, click on **MeshComponentData** to expand its properties
 2. **Browse for mesh** - Click the **Browse** button next to the **Mesh** property
 3. **Navigate to primitives** - In the Database browser that opens, expand **Source**, then expand **System**, then expand **Scene**, and finally select the **Meshes** group
+
+![Mesh selection dialog showing available primitive meshes](../images/tutorial-01-first-scene-mesh-selection.png)
+
 4. **Select Cube** - Choose **Cube** from the available primitive meshes and click **OK**
 
 You should now see a cube in your scene!
@@ -162,9 +165,34 @@ Every scene needs a camera to define the viewpoint. By convention, Traktor uses 
 2. **Name it** - Name the entity "Camera0" (note the zero at the end - this is important!)
 3. **Add Camera Component** - Right-click the "Camera0" entity and select **Add Component**, then choose **CameraComponentData** under the **world** category
 
-The camera is now added to your scene. You can position it by adjusting its transform properties, but for now, the default position works fine for viewing your cube.
+### Configure the Camera
 
-![TODO: Screenshot showing a simple cube created with primitives in the scene with lighting]
+The camera needs a few adjustments to work properly:
+
+1. **Change projection** - With "Camera0" selected, expand **CameraComponentData** in the Properties panel. Find the **Projection** property and change it from **Orthographic** to **Perspective**
+2. **Position the camera** - In the Camera0 entity's transform properties (at the top of the Properties panel):
+   - Set **Translation** to `X: 0, Y: 2, Z: -8`
+   - Set **Rotation** to `X: 0, Y: 15, Z: 0`
+
+This positions the camera back from the cube and slightly above, with a gentle downward angle for a nice view of your scene.
+
+![Scene Editor showing the lit cube with camera positioned for a good view](../images/tutorial-01-first-scene-lit-with-cube.png)
+
+### View Through the Camera
+
+To see what your scene will look like at runtime, you can switch the Scene Editor view to use the Camera:
+
+1. **Switch view mode** - In the Scene Editor toolbar at the top of the viewport, click the view dropdown (currently showing "Perspective")
+
+![Scene Editor view dropdown menu](../images/tutorial-01-first-scene-scene-editor-view.png)
+
+2. **Select Camera** - Choose "Camera" from the dropdown menu
+
+You'll now see exactly what the player will see when the game runs, using your Camera0 viewpoint:
+
+![Scene viewed through Camera0 showing the lit cube from the configured camera angle](../images/tutorial-01-first-scene-scene-camera-view.png)
+
+This is the view that will be rendered when you run your scene. You can switch back to "Perspective" at any time to return to the free-moving editor camera.
 
 ---
 
@@ -183,13 +211,15 @@ Try selecting the cube and pressing F to center it in your view, then navigate a
 
 ## What's Next?
 
-Congratulations! You've created your first lit 3D scene with geometry. Here's what you can try next:
+Congratulations! You've created your first lit 3D scene with geometry and a camera. Now let's make it interactive!
+
+Continue to **[Tutorial 02: Add Your First Script](tutorial-02-first-script/)** to write Lua code that brings your cube to life with movement.
+
+### More Ideas
 
 **Experiment with primitives** - Add more entities with mesh components and try different primitive meshes like spheres, cylinders, cones, or torus shapes. Position them around your scene to build interesting compositions.
 
 **Learn the editor** - Read the [Editor Documentation](../../editor/) to understand the Database, Pipeline, Scene Editor tools, and deployment.
-
-**Add gameplay** - Learn [Scripting](../../engine/scripting/) to add behavior to your entities with Lua scripts.
 
 **Explore the engine** - Dive into the [Engine Documentation](../../engine/) to learn about rendering, physics, audio, animation, and more.
 
