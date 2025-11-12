@@ -60,7 +60,7 @@ These guides walk you through configuring your build environment, compiling the 
 Once you have Traktor built and the editor running, follow these tutorials in order:
 
 1. **[Tutorial 00: Create Your First Project](tutorial-00-first-project/)** - Create a workspace and understand the project structure
-2. **[Tutorial 01: Create Your First Scene](tutorial-01-first-scene/)** - Build a lit scene with CSG geometry
+2. **[Tutorial 01: Create Your First Scene](tutorial-01-first-scene/)** - Build a lit scene with geometry
 
 ---
 

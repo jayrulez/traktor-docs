@@ -8,7 +8,7 @@ nav_order: 4
 
 # Tutorial 01: Create Your First Scene
 
-Now that you have a project created, let's make a simple 3D scene with lighting and geometry. By the end of this tutorial, you'll have a lit scene with a primitive cube you can see and manipulate.
+Now that you have a project created, let's make a simple 3D scene with lighting and geometry. By the end of this tutorial, you'll have a lit scene with a cube you can see and manipulate.
 
 ## Step 1: Create a Scene Asset
 
@@ -114,52 +114,55 @@ With the environment probe added, you'll notice significantly better ambient lig
 
 ---
 
-## Step 4: Add Geometry with Primitives
+## Step 4: Add Geometry with a Primitive Mesh
 
-Traktor includes a primitive mesh system that lets you create basic shapes like cubes, spheres, cylinders, and more directly in the editor. These are perfect for prototyping and building simple geometry without needing external 3D modeling software.
+Traktor includes primitive meshes - pre-made basic shapes like cubes, spheres, cylinders, and more. These are perfect for prototyping and learning the basics without needing to import 3D models.
 
-Let's create a simple cube using primitive meshes.
+Let's add a simple cube to your scene.
 
 ### Create the Objects Layer
 
 1. **Create a layer** - Right-click in the Entities panel and select **Add Layer**
 2. **Name it** - Name the layer "Objects"
 
-### Create a Primitive Mesh Entity
+### Add a Cube Entity
 
 1. **Add an entity** - Right-click the Objects layer and select **Add Entity**
-2. **Name it** - Name the entity "MyCube"
-3. **Add Group Component** - With "MyCube" selected, click **Add Component** and select **Group** component
-4. **Add Solid Component** - Click **Add Component** again and select **Solid** component
+2. **Name it** - Name the entity "Cube"
+3. **Add Mesh Component** - Right-click the "Cube" entity and select **Add Component**, then choose **MeshComponentData** under the **mesh** category
 
-The Group component allows this entity to have children, and the Solid component tells Traktor to generate geometry from primitive shapes.
+### Select the Cube Mesh
 
-### Add a Primitive Shape
+Now you need to tell the mesh component which mesh to display:
 
-1. **Create a child entity** - Right-click "MyCube" in the entity hierarchy and select **Add Entity**
-2. **Name it** - Name the child entity "Box"
-3. **Add Primitive Component** - With "Box" selected, click **Add Component** and select **Primitive** component
-4. **Configure the primitive**:
-   - In the Primitive Component properties, set **Operation** to **Union**
-   - Set **Shape** to **BoxShape**
+1. **Expand the component** - In the Properties panel, click on **MeshComponentData** to expand its properties
+2. **Browse for mesh** - Click the **Browse** button next to the **Mesh** property
+3. **Navigate to primitives** - In the Database browser that opens, expand **Source**, then expand **System**, then expand **Scene**, and finally select the **Meshes** group
+4. **Select Cube** - Choose **Cube** from the available primitive meshes and click **OK**
 
 You should now see a cube in your scene!
 
-### Available Primitive Shapes
+### Available Primitive Meshes
 
-Traktor provides several primitive shapes you can use:
-- **BoxShape** - Cube/rectangular box
-- **SphereShape** - Sphere
-- **CylinderShape** - Cylinder
-- **ConeShape** - Cone
-- **TorusShape** - Donut/torus
+Traktor provides several primitive meshes you can use in the **Source/System/Scene/Meshes** folder:
+- **Cube** - A cube/box shape
+- **Sphere** - A sphere
+- **Cylinder** - A cylinder
+- **Cone** - A cone
+- **Plane** - A flat plane
+- **Torus** - A donut/torus shape
 
-You can combine multiple primitive shapes in the same entity by adding more child entities with Primitive components. The **Operation** setting controls how shapes interact:
-- **Union** - Combines shapes together
-- **Subtract** - Cuts holes by removing one shape from another
-- **Intersect** - Keeps only the overlapping areas
+You can add more entities with mesh components and select different primitive meshes to build up your scene.
 
-For now, you have a single box, but you can experiment by adding more primitive child entities with different shapes.
+### Add a Camera
+
+Every scene needs a camera to define the viewpoint. By convention, Traktor uses a camera named **Camera0** as the default camera.
+
+1. **Add an entity** - Right-click the Objects layer and select **Add Entity**
+2. **Name it** - Name the entity "Camera0" (note the zero at the end - this is important!)
+3. **Add Camera Component** - Right-click the "Camera0" entity and select **Add Component**, then choose **CameraComponentData** under the **world** category
+
+The camera is now added to your scene. You can position it by adjusting its transform properties, but for now, the default position works fine for viewing your cube.
 
 ![TODO: Screenshot showing a simple cube created with primitives in the scene with lighting]
 
@@ -182,7 +185,7 @@ Try selecting the cube and pressing F to center it in your view, then navigate a
 
 Congratulations! You've created your first lit 3D scene with geometry. Here's what you can try next:
 
-**Experiment with primitives** - Add more primitive child entities to "MyCube" with different shapes like spheres, cylinders, or cones. Try different **Operation** settings: use **Subtract** to cut holes in the cube, or **Union** to combine shapes together.
+**Experiment with primitives** - Add more entities with mesh components and try different primitive meshes like spheres, cylinders, cones, or torus shapes. Position them around your scene to build interesting compositions.
 
 **Learn the editor** - Read the [Editor Documentation](../../editor/) to understand the Database, Pipeline, Scene Editor tools, and deployment.
 
