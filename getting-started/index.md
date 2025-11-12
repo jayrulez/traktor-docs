@@ -8,7 +8,7 @@ has_children: true
 
 # Getting Started with Traktor
 
-This guide walks you through building Traktor from source, creating your first project, and making a simple scene. By the end, you'll have a working development environment and understand the basic workflow for making games with Traktor.
+This guide walks you through getting Traktor, creating your first project, and making a simple scene. By the end, you'll have a working development environment and understand the basic workflow for making games with Traktor.
 
 ## System Requirements
 
