@@ -3,7 +3,7 @@ layout: default
 permalink: /getting-started/example-projects/
 title: Example Projects
 parent: Getting Started
-nav_order: 5
+nav_order: 7
 ---
 
 ## Example Projects
