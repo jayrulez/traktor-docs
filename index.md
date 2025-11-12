@@ -9,7 +9,7 @@ nav_order: 1
 
 Traktor is an open-source game engine written in C++ with a focus on modularity, performance, and developer workflow. It provides a complete development environment: a professional editor with hot-reloading, a modern Vulkan-based renderer with ray tracing, and a flexible architecture designed to be extended and customized.
 
-![TODO: Screenshot showing the Traktor editor with a game scene open - Scene Editor viewport in center, Database panel on left, Properties on right, demonstrating the professional editing environment]
+![Traktor editor showing Scene Editor viewport, Database panel, and Properties panel](images/screenshot-main.png)
 
 The engine has shipped commercial games on Steam, PlayStation Network, iOS, and Mac, proving itself in real-world production. Traktor follows an "editor-first" philosophy: rather than treating the editor as an afterthought, the entire engine is built around a powerful editing workflow. Changes you make appear in your running game within milliseconds, making iteration fast and development efficient.
 
@@ -30,32 +30,6 @@ The engine has shipped commercial games on Steam, PlayStation Network, iOS, and 
 Traktor's editor runs on **Windows** and **Linux**. These are the primary development platforms with full support and regular testing.
 
 The runtime (your actual game) has mature support for **Windows** and **Linux** as well. **Android**, **iOS**, and **macOS** builds are functional but considered experimental. They receive updates and should work, but aren't tested as rigorously as the desktop platforms. If you're targeting mobile or macOS, expect to do more testing and potentially encounter platform-specific issues.
-
----
-
-## Core Systems
-
-### Editor and Workflow
-
-The Traktor editor is designed for productivity. It maintains an active connection to your running game, streaming asset changes in real-time. Modify a texture, adjust a script, tweak a material, and watch it update within milliseconds without restarting. One-click deployment builds your assets, packages the game, deploys to any connected target (Windows, Linux, Android, iOS), and launches with a live debugger connection. The asset pipeline is highly parallelized, using all CPU cores for fast incremental builds. Only modified assets rebuild, not the entire project. The editor supports light, dark, and custom themes to match your preferences and lighting environment.
-
-### Rendering
-
-Traktor uses a modern Vulkan-based frame graph renderer. Ray tracing support includes ray-traced global illumination (RTGI), ambient occlusion (RTAO), reflections, and shadows, with ReSTIR GI providing advanced global illumination quality. The shader graph is a node-based visual editor where you wire nodes together to create materials, with instant hot-reload when you make changes. If you need low-level control, you can drop into GLSL code within the graph. The renderer supports both deferred and Forward+ rendering paths, and includes a GPU skin cache for efficient character rendering.
-
-![TODO: Screenshot showing ray-traced rendering with global illumination, reflections, and realistic lighting in a sample scene]
-
-### Scripting
-
-**Lua** is the primary scripting language for gameplay logic. An integrated debugger lets you set breakpoints, step through code, and inspect variables. Hot-reload works for scripts. Edit your Lua code, save, and the changes appear in your running game immediately. A built-in profiler helps identify performance bottlenecks in your script code.
-
-### Audio
-
-The HD Audio pipeline supports multichannel configurations: stereo (2.0), 2.1, 5.1, 7.1, and custom speaker arrangements. Multiple audio backends are available depending on your platform: XAudio2 and DirectSound on Windows, OpenAL, ALSA, and PulseAudio on Linux. Graph-based audio filters provide processing and effects. Streaming audio supports MP3, FLAC, and OGG formats for music and long sound files, keeping memory usage low.
-
-### Physics
-
-Traktor supports two physics engines: **Jolt** (modern, high-performance) and **Bullet** (mature, widely used). You can choose the backend that fits your project. A character controller provides easy-to-use character physics with ground detection, step climbing, and sliding. An advanced vehicle controller simulates realistic vehicle dynamics for racing games or driving mechanics.
 
 ---
 
