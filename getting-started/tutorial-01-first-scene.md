@@ -96,17 +96,21 @@ This directional light simulates sunlight - parallel light rays coming from a si
 
 The Sky component adds atmospheric rendering - you'll see a gradient sky in the viewport that provides ambient lighting and a visible horizon.
 
-### (Optional) Add an Environment Probe
-
-For more realistic reflections, you can add an environment probe:
-
-1. **Add an entity** - Right-click the Environment layer and select **Add Entity**
-2. **Name it** - Name the entity "Probe"
-3. **Add the component** - Click **Add Component** and select **Environment** component
-
 Your scene should now be visible with basic lighting. You'll see the sky gradient and any objects you add will be properly lit by the sun.
 
 ![Scene Editor showing lit scene with sky gradient and directional lighting](../images/tutorial-01-first-scene-lit.png)
+
+### (Optional) Add an Environment Probe
+
+For more realistic reflections and improved lighting quality, you can add an environment probe:
+
+1. **Add an entity** - Right-click the Environment layer and select **Add Entity**
+2. **Name it** - Name the entity "Probe"
+3. **Add the component** - Right-click the "Probe" entity and select **Add Component**, then choose **Environment** component
+
+With the environment probe added, you'll notice significantly better ambient lighting and reflections in your scene:
+
+![Scene Editor showing enhanced lighting with environment probe added](../images/tutorial-01-first-scene-lit-probe.png)
 
 ---
 
