@@ -77,7 +77,7 @@ You don't typically need to interact with these files directly - the editor mana
 
 Now that you have a project created and understand its structure, you're ready to create your first scene.
 
-Continue to **[Tutorial 01: Create Your First Scene](tutorial-01-first-scene/)** to add lighting and geometry.
+Continue to **[Tutorial 01: Create Your First Scene](tutorial-01-first-scene.md)** to add lighting and geometry.
 
 ## See Also
 
