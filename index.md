@@ -35,11 +35,11 @@ The runtime (your actual game) has mature support for **Windows** and **Linux** 
 
 ## Documentation
 
-**[Getting Started](getting-started/)** walks you through building Traktor from source, creating your first project, and understanding the basic workflow. If you're new to the engine, start here.
+**[Getting Started](getting-started/)** walks you through getting Traktor, creating your first project, and understanding the basic workflow. If you're new to the engine, start here.
 
 **[Engine Documentation](engine/)** covers the runtime systems. The code that powers your game. Learn about [architecture](engine/architecture/) and how the engine is organized, [scripting](engine/scripting/) with Lua for gameplay logic, [rendering](engine/render/) with the Vulkan-based graphics system, [physics](engine/physics/) for rigid bodies and character movement, and the [world system](engine/world/) that handles entities and components. Additional systems include [audio](engine/audio/), [animation](engine/animation/), [AI navigation](engine/ai/), [networking](engine/networking/), and more.
 
-**[Editor Documentation](editor/)** teaches you the tools for building your game. Understand the editor interface and its dockable panels, manage assets in the Database, build 3D worlds in the Scene Editor, create materials with the visual Shader Graph, and use one-click deployment to test on any platform. The editor is where you'll spend most of your time, so mastering its workflow is essential.
+**[Editor Documentation](editor/)** teaches you the tools for building your game. Understand the editor interface, manage assets in the Database, build 3D worlds in the Scene Editor, create materials with the visual Shader Graph, and use one-click deployment to test on any platform. The editor is where you'll spend most of your time, so mastering its workflow is essential.
 
 ---
 
