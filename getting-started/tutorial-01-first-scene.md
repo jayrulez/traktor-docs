@@ -92,7 +92,7 @@ This directional light simulates sunlight - parallel light rays coming from a si
 1. **Add an entity** - Right-click the Environment layer and select **Add Entity**
 2. **Name it** - Name the entity "Sky"
 3. **Add the sky component** - With "Sky" selected, click **Add Component** in the Properties panel
-4. **Choose component type** - Select **Sky** component
+4. **Choose component type** - Select **SkyComponentData** under the **weather** category.
 
 The Sky component adds atmospheric rendering - you'll see a gradient sky in the viewport that provides ambient lighting and a visible horizon.
 
@@ -106,7 +106,7 @@ For more realistic reflections and improved lighting quality, you can add an env
 
 1. **Add an entity** - Right-click the Environment layer and select **Add Entity**
 2. **Name it** - Name the entity "Probe"
-3. **Add the component** - Right-click the "Probe" entity and select **Add Component**, then choose **Environment** component
+3. **Add the component** - Right-click the "Probe" entity and select **Add Component**, then choose **ProbeComponentData** under the world category.
 
 With the environment probe added, you'll notice significantly better ambient lighting and reflections in your scene:
 
