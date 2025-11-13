@@ -31,7 +31,7 @@ Let's configure the default Stage to load our scene:
 
 ![Database panel showing Stage folder with Main stage](../images/tutorial-03-deploy-database-stage.png)
 
-The Stage Editor opens, showing the current stage configuration. By default, it's empty and won't load any scenes.
+The Stage Editor opens, showing the current stage configuration. By default, it's doesn't have a world layer and won't load any scenes.
 
 ![Empty Stage Editor](../images/tutorial-03-deploy-database-stage-editor.png)
 
@@ -41,7 +41,7 @@ The Stage Editor opens, showing the current stage configuration. By default, it'
 
 Now let's add a World Layer to load our scene:
 
-1. **Add a layer** - In the Stage Editor, right-click in the layers list and select **Add Layer**
+1. **Add a layer** - In the Stage Editor, click the browse button for the Layers to select a layer.
 2. **Choose World Layer** - In the dialog that opens, select **World Layer** and click **OK**
 
 ![Add Layer dialog showing World Layer selection](../images/tutorial-03-deploy-database-stage-layer-selector.png)
@@ -64,7 +64,7 @@ The World Layer needs to know which scene to load:
 
 ![Database browser with FirstScene selected](../images/tutorial-03-deploy-database-stage-editor-world-layer-select-scene.png)
 
-5. **Save the stage** - Press **Ctrl+S** or go to **File → Save** to save the Main stage
+5. **Save the stage** - Click **OK** to save the Main stage
 
 Your stage is now configured to load FirstScene when the game runs!
 
