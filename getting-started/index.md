@@ -62,6 +62,7 @@ Once you have Traktor built and the editor running, follow these tutorials in or
 1. **[Tutorial 00: Create Your First Project](tutorial-00-first-project/)** - Create a workspace and understand the project structure
 2. **[Tutorial 01: Create Your First Scene](tutorial-01-first-scene/)** - Build a lit scene with geometry
 3. **[Tutorial 02: Add Your First Script](tutorial-02-first-script/)** - Write Lua code to bring your scene to life
+4. **[Tutorial 03: Deploy and Run Your Game](tutorial-03-deploy-and-run/)** - Build and run your game on a target platform
 
 ---
 
