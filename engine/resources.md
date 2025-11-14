@@ -305,23 +305,58 @@ class MyResourceFactory : public resource::IResourceFactory
 {
     T_RTTI_CLASS;
 public:
-    virtual bool create(
+    virtual bool initialize(const ObjectStore& objectStore) override
+    {
+        // Initialize factory
+        return true;
+    }
+
+    virtual const TypeInfoSet getResourceTypes() const override
+    {
+        // Return which resource types this factory handles
+        return makeTypeInfoSet< MyResourceData >();
+    }
+
+    virtual const TypeInfoSet getProductTypes(const TypeInfo& resourceType) const override
+    {
+        // Return which product types can be created from resource type
+        return makeTypeInfoSet< MyResource >();
+    }
+
+    virtual bool isCacheable(const TypeInfo& productType) const override
+    {
+        // Return true if resources should be shared (resident)
+        // Return false if each bind should create exclusive instances
+        return true;  // Most resources are cacheable
+    }
+
+    virtual Ref< Object > create(
         resource::IResourceManager* resourceManager,
         const db::Database* database,
         const db::Instance* instance,
-        Ref<ISerializable>& outResource
+        const TypeInfo& productType,
+        const Object* current
     ) const override
     {
-        // Load and create resource
-        Ref<MyResource> resource = new MyResource();
-        // ... initialize resource ...
-        outResource = resource;
-        return true;
+        // Load resource data from database
+        Ref< const MyResourceData > data = instance->getObject< MyResourceData >();
+        if (!data)
+            return nullptr;
+
+        // Create runtime resource from data
+        Ref< MyResource > resource = new MyResource();
+        // ... initialize resource from data ...
+
+        return resource;
     }
 };
 ```
 
-The factory tells the resource system how to create instances of your custom type from the database.
+The factory tells the resource system:
+- **Which resource types it handles** (from the output database)
+- **Which product types it creates** (runtime objects)
+- **Whether resources are cacheable** (shared vs exclusive)
+- **How to create instances** from database data
 
 ## Managing Memory
 
