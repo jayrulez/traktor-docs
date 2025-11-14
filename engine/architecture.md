@@ -31,6 +31,61 @@ The architecture is designed around four key principles:
 
 Traktor's architecture resembles a building with a strong foundation and increasingly specialized floors. Let's explore each layer, starting from the bottom and working our way up.
 
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                          Applications (Layer 8)                        │
+│  Editor.App  Runtime.App  Pipeline.App  SolutionBuilder.App  Run.App  │
+└────────────────────────────────────────────────────────────────────────┘
+                                     ▲
+┌────────────────────────────────────────────────────────────────────────┐
+│                        Editor Modules (Layer 7)                        │
+│  Render.Editor  World.Editor  Animation.Editor  Physics.Editor  etc.  │
+└────────────────────────────────────────────────────────────────────────┘
+                                     ▲
+┌────────────────────────────────────────────────────────────────────────┐
+│                        Editor Framework (Layer 6)                      │
+│                               Editor                                   │
+└────────────────────────────────────────────────────────────────────────┘
+                                     ▲
+┌────────────────────────────────────────────────────────────────────────┐
+│                        Runtime System (Layer 5)                        │
+│                              Runtime                                   │
+│    (Orchestrates all game systems through server architecture)        │
+└────────────────────────────────────────────────────────────────────────┘
+                                     ▲
+┌────────────────────────────────────────────────────────────────────────┐
+│                   High-Level Game Systems (Layer 4)                    │
+│  Mesh  Animation  Spray  Weather  Terrain  Theater  Ai  Online  Spark │
+└────────────────────────────────────────────────────────────────────────┘
+                                     ▲
+┌────────────────────────────────────────────────────────────────────────┐
+│                    World and Physics (Layer 3)                         │
+│                 World  Physics  Scene                                  │
+└────────────────────────────────────────────────────────────────────────┘
+                                     ▲
+┌────────────────────────────────────────────────────────────────────────┐
+│                       Core Systems (Layer 2)                           │
+│  Database  Render  Sound  Input  Script  Ui  Model  Video  Heightfield│
+└────────────────────────────────────────────────────────────────────────┘
+                                     ▲
+┌────────────────────────────────────────────────────────────────────────┐
+│                    Low-Level Utilities (Layer 1)                       │
+│  Compress  Xml  Net  Sql  Drawing  Resource  I18N  Html  Json  Svg    │
+└────────────────────────────────────────────────────────────────────────┘
+                                     ▲
+┌────────────────────────────────────────────────────────────────────────┐
+│                          Foundation (Layer 0)                          │
+│                                Core                                    │
+│   (Object system, RTTI, math, threading, I/O, containers, memory)     │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+**Dependency Rules:**
+- Each layer can only depend on layers below it
+- No circular dependencies between modules
+- Editor modules (.Editor suffix) separate from runtime code
+- Core has zero dependencies - it's the foundation for everything
+
 ### Layer 1: Core - The Foundation
 
 Everything starts with the **Core** module. This is the bedrock that all other systems build upon, providing the fundamental services that make a game engine possible.

@@ -6,9 +6,13 @@ nav_order: 3
 has_children: true
 ---
 
-# Traktor Engine
+# Engine Documentation
 
-The Traktor engine is a modular, high-performance C++ game engine with modern rendering, physics, and scripting capabilities.
+Welcome to the Traktor engine documentation. This section covers the technical architecture, core systems, and APIs you'll work with when building games with Traktor.
+
+These docs are organized from foundational concepts to specialized systems. Start with **Architecture** to understand how everything fits together, then explore **Runtime** and **World** to learn the application model and entity-component system. From there, dive into the specific systems your game needs: rendering, physics, animation, audio, scripting, and more.
+
+Each page explains not just *how* to use a system, but *why* it works that way. You'll find practical code examples in both C++ and Lua, best practices learned from real projects, and references to the actual source code when you need to go deeper.
 
 ## Core Systems
 
