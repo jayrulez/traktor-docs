@@ -11,32 +11,71 @@ nav_order: 7
 
 Imagine you're building a massive game world with thousands of 3D models, textures, sounds, and scripts. You can't load everything into memory at once. That would consume gigabytes and make startup painfully slow. But you also can't manually track what's loaded, when to load it, and when to unload it. That's a recipe for crashes, hitches, and headaches.
 
-This is where Traktor's **Resource system** shines. Think of it as a smart librarian for your game's assets. You ask for a resource by name, and the system handles all the details: finding it on disk, loading it into memory, caching it so you don't load it twice, and even automatically reloading it when you make changes during development. The system is lazy (resources only load when actually needed), efficient (shared resources are loaded once), and automatic (reference counting handles cleanup).
+This is where Traktor's **Resource system** shines. Think of it as a smart librarian for your game's assets. You ask for a resource by its unique identifier (GUID), and the system handles all the details: finding it in the database, loading it into memory, caching it so you don't load it twice, and even automatically reloading it when you make changes during development. The system is lazy (resources only load when actually needed), efficient (shared resources are loaded once), and automatic (reference counting handles cleanup).
 
 The resource system manages everything your game needs: meshes, textures, materials, sounds, scripts, animations, and more. It's one of those invisible systems that, when done right, you never think about. It just works.
 
-## The Proxy Pattern: Claim Tickets for Resources
+## Assets vs Resources: The Two-Database System
 
-At the heart of the resource system is the **Proxy** pattern. Think of a `Proxy<T>` as a claim ticket or voucher. When you request a resource, you get a proxy immediately. It's lightweight and fast. The actual resource might not be loaded yet, but that's okay. When you try to use the resource, the proxy automatically loads it if needed.
+Traktor uses a clever two-database architecture that separates authoring from runtime:
+
+**Source Database** contains **Assets** - these are what you see and edit in the editor:
+- SceneAsset, TextureAsset, MeshAsset, ShaderAsset, etc.
+- Can reference external files (.png, .blend, .fbx, etc.)
+- Defined in `.Editor` modules and never shipped with your game
+- Editable, human-friendly representations
+
+**Output Database** contains **Resources** - these are what your game actually loads:
+- SceneResource, TextureResource, MeshResource, ShaderResource, etc.
+- Store optimized binary data in database data channels
+- Platform-specific and ready for runtime use
+- Compact, optimized representations
+
+The **Pipeline** transforms assets into resources. When you edit a texture in Photoshop and save the .png file, the pipeline detects the change, rebuilds the TextureAsset into a TextureResource, and your running game can hot-reload it automatically.
+
+This separation means:
+- Mobile/console targets can stream content directly from your PC running the editor
+- Hot-reloading works seamlessly - change an asset, see it update in the running game
+- Final game packages contain only a single compact database with optimized resources
+- Editor tools never pollute runtime code
+
+## The Proxy Pattern: Handles to Resources
+
+At the heart of the resource system is the **Proxy** pattern. A `Proxy<T>` wraps a resource handle that provides reference-counted access to loaded resources.
 
 ```cpp
 // Declare resource proxy
 resource::Proxy<render::Mesh> m_meshResource;
 
-// Load resource (returns immediately, actual load happens lazily)
-m_meshResource = resourceManager->load<render::Mesh>("Meshes/Character");
+// Create resource ID from GUID
+// The GUID identifies the resource in the output database
+resource::Id<render::Mesh> meshId(Guid(L"{12345678-1234-5678-1234-567812345678}"));
 
-// Access resource (triggers load if not yet loaded)
-render::Mesh* mesh = m_meshResource;
+// Bind the ID to the proxy
+// This loads the resource immediately if not already cached
+if (resourceManager->bind(meshId, m_meshResource))
+{
+    // Binding successful - resource is loaded and ready
+    render::Mesh* mesh = m_meshResource;
+    // Use mesh
+}
+else
+{
+    // Binding failed - resource couldn't be loaded
+}
 
-// Check if loaded
+// Check if resource is available
 if (m_meshResource)
 {
-    // Use mesh
+    // Resource is loaded and ready to use
 }
 ```
 
-This approach has huge benefits: you can set up references to resources during initialization without stalling while they load, resources load on-demand rather than all at once, and multiple objects can share the same resource (it's only loaded once in memory).
+**Important:** Resources are loaded by **GUID** (Global Unique Identifier), not by path. Each asset in the editor has a unique GUID that identifies it. You can copy an asset's GUID by right-clicking it in the Database view and selecting "Copy GUID" or similar.
+
+**Note on type parameters:** Both `Id<T>` and `Proxy<T>` use **runtime resource types**. These are the types your game actually uses at runtime (e.g., `render::Mesh`, `render::Shader`, `render::ITexture`). The types can often be the same: `Id<render::Shader>` binds to `Proxy<render::Shader>`.
+
+This approach has key benefits: **cacheable resources are shared** (only loaded once in memory even if bound multiple times), the proxy automatically handles hot-reloading for you, and reference counting ensures resources are only unloaded when no longer needed.
 
 ## The Resource Manager: Your Asset Librarian
 
@@ -45,48 +84,73 @@ The **IResourceManager** is the central hub for loading resources. It tracks wha
 ```cpp
 class IResourceManager
 {
-    // Load resource by path
-    template<typename T>
-    Proxy<T> load(const std::string& path);
+    // Bind resource ID to a proxy
+    // The proxy will automatically load the resource when accessed
+    template<typename ResourceType, typename ProductType>
+    bool bind(const Id<ResourceType>& id, Proxy<ProductType>& outProxy);
 
-    // Reload resource (hot-reload)
-    void reload(const Guid& resourceId);
+    // Reload specific resource (hot-reload)
+    bool reload(const Guid& guid, bool flushedOnly);
 
-    // Release all cached resources
-    void releaseAll();
+    // Reload all resources of a specific type
+    void reload(const TypeInfo& productType, bool flushedOnly);
+
+    // Unload all resources of a specific type
+    void unload(const TypeInfo& productType);
+
+    // Unload externally unused, resident resources
+    void unloadUnusedResident();
+
+    // Get resource manager statistics
+    void getStatistics(ResourceManagerStatistics& outStatistics) const;
+
+    // Add/remove resource factories
+    void addFactory(const IResourceFactory* factory);
+    void removeFactory(const IResourceFactory* factory);
 };
 ```
 
+The key method is **`bind()`** which takes a resource `Id` and binds it to a proxy. The proxy will handle loading the resource when you first access it, and it also handles hot-reloading automatically.
+
 ### Accessing the Resource Manager
 
-From C++, you get the resource manager through the environment:
+From C++, you get the resource manager through the resource server:
 
 ```cpp
-// From C++
-IResourceServer* resourceServer = environment->getResourceServer();
-IResourceManager* resourceManager = resourceServer->getResourceManager();
+// Get resource manager from environment
+IResourceManager* resourceManager = environment->getResourceServer()->getResourceManager();
 
-Proxy<Mesh> mesh = resourceManager->load<Mesh>("Meshes/Character");
+// Create a resource ID from a GUID
+resource::Id<render::Mesh> meshId(Guid(L"{12345678-1234-5678-1234-567812345678}"));
+
+// Bind to a proxy
+resource::Proxy<render::Mesh> meshProxy;
+if (resourceManager->bind(meshId, meshProxy))
+{
+    // Binding successful
+    render::Mesh* mesh = meshProxy;  // Access the resource
+}
 ```
 
-From Lua, the context object usually provides access (though most of the time, resources are loaded automatically):
+**Getting the GUID:** In the Traktor editor, you can get a resource's GUID by:
+1. Right-clicking the asset in the Database view
+2. Selecting "Copy GUID" or "Copy ID" from the context menu
+3. The GUID will be copied to your clipboard in the format `{xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx}`
 
-```lua
--- From Lua (usually handled automatically)
-local mesh = context.resourceManager:load("Meshes/Character")
-```
+From Lua, resources are typically loaded automatically through component data, but you can access them if needed through the context.
 
 ## Loading Different Resource Types
 
-The beauty of the resource system is that it works the same way regardless of what you're loading:
+The beauty of the resource system is that it works the same way regardless of what you're loading. The pattern is always: create an `Id` with the resource type, bind it to a proxy with the same (or compatible) type, and access when ready.
 
 **Meshes** (3D models):
 
 ```cpp
-resource::Proxy<render::Mesh> meshResource;
-meshResource = resourceManager->load<render::Mesh>("Meshes/Character");
+resource::Id<render::Mesh> meshId(Guid(L"{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"));
+resource::Proxy<render::Mesh> meshProxy;
+resourceManager->bind(meshId, meshProxy);
 
-render::Mesh* mesh = meshResource;
+render::Mesh* mesh = meshProxy;
 if (mesh)
 {
     // Use mesh for rendering
@@ -96,80 +160,114 @@ if (mesh)
 **Textures** (images):
 
 ```cpp
-resource::Proxy<render::Texture> textureResource;
-textureResource = resourceManager->load<render::Texture>("Textures/Albedo");
+resource::Id<render::ITexture> textureId(Guid(L"{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}"));
+resource::Proxy<render::ITexture> textureProxy;
+resourceManager->bind(textureId, textureProxy);
 
-render::Texture* texture = textureResource;
+render::ITexture* texture = textureProxy;
 ```
 
-**Materials** (shaders and rendering properties):
+**Shaders** (materials and rendering properties):
 
 ```cpp
-resource::Proxy<render::Shader> shaderResource;
-shaderResource = resourceManager->load<render::Shader>("Materials/PBR");
+resource::Id<render::Shader> shaderId(Guid(L"{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}"));
+resource::Proxy<render::Shader> shaderProxy;
+resourceManager->bind(shaderId, shaderProxy);
 
-render::Shader* shader = shaderResource;
+render::Shader* shader = shaderProxy;
 ```
 
 **Sounds** (audio files):
 
 ```cpp
-resource::Proxy<sound::Sound> soundResource;
-soundResource = resourceManager->load<sound::Sound>("Audio/Explosion");
+resource::Id<sound::Sound> soundId(Guid(L"{DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD}"));
+resource::Proxy<sound::Sound> soundProxy;
+resourceManager->bind(soundId, soundProxy);
 
-sound::Sound* sound = soundResource;
+sound::Sound* sound = soundProxy;
 ```
 
-**Scripts** (Lua code):
+**Scenes** (levels and game worlds):
 
 ```cpp
-resource::Proxy<script::Script> scriptResource;
-scriptResource = resourceManager->load<script::Script>("Scripts/Player");
+resource::Id<world::SceneResource> sceneId(Guid(L"{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}"));
+resource::Proxy<world::SceneResource> sceneProxy;
+resourceManager->bind(sceneId, sceneProxy);
 
-script::Script* script = scriptResource;
+world::SceneResource* scene = sceneProxy;
 ```
 
-The pattern is always the same: declare a proxy of the appropriate type, load it by path, and use it when ready.
+The pattern is always the same: create an `Id<ResourceType>` from the GUID, bind it to a `Proxy<ResourceType>`, and access when ready. The proxy keeps the resource loaded and automatically handles hot-reloading.
 
-## Asynchronous Loading: Avoiding Hitches
+## Resource Caching and Sharing
 
-Synchronous loading (waiting for a resource to load before continuing) can freeze your game for seconds when loading large assets. That's unacceptable for smooth gameplay. **Asynchronous loading** lets you start a load in the background and check back later when it's ready:
+The resource manager automatically caches loaded resources. When you bind a resource:
+
+1. **Cacheable resources** (determined by the factory) are stored in a shared cache
+2. **Multiple bind calls** with the same GUID return handles to the same cached resource
+3. **Non-cacheable resources** create exclusive handles for each bind
 
 ```cpp
-// Start async load
-Ref<ResourceLoader> loader = resourceManager->loadAsync<Mesh>("Meshes/LargeLevel");
+// First bind - loads the resource and caches it
+resource::Id<render::Shader> shaderId(Guid(L"{12345678-1234-5678-1234-567812345678}"));
+resource::Proxy<render::Shader> shaderProxy1;
+resourceManager->bind(shaderId, shaderProxy1);  // Loads from database
 
-// Check if loaded (in update loop)
-if (loader->isReady())
+// Second bind - returns handle to the same cached resource
+resource::Proxy<render::Shader> shaderProxy2;
+resourceManager->bind(shaderId, shaderProxy2);  // Reuses cached resource, no load
+
+// Both proxies point to the same shader instance
+T_ASSERT(shaderProxy1.getResource() == shaderProxy2.getResource());
+```
+
+This means resources are only loaded once, even if multiple systems or entities reference them.
+
+### Detecting Hot-Reload Changes
+
+The `Proxy` class provides `changed()` and `consume()` methods to detect when a resource has been hot-reloaded:
+
+```cpp
+resource::Proxy<render::Shader> shaderProxy;
+// ... bind shader ...
+
+// In update loop
+if (shaderProxy.changed())
 {
-    Proxy<Mesh> mesh = loader->getResource();
-    // Use mesh
-}
-else
-{
-    // Still loading, show progress
-    float progress = loader->getProgress();  // 0.0 to 1.0
+    // Resource was hot-reloaded, update dependent state
+    rebuildMaterial();
+
+    // Mark change as handled
+    shaderProxy.consume();
 }
 ```
 
-This is perfect for loading screens. Start the async load, display a progress bar that updates each frame, and transition to gameplay when everything's ready.
+### Resident vs Exclusive Resources
+
+Resources can be either **resident** (cacheable, shared) or **exclusive** (non-cacheable, per-bind):
+
+- **Resident resources** persist in the cache until explicitly unloaded or the manager is destroyed
+- **Exclusive resources** can have multiple independent handles, each can be loaded/unloaded independently
+- The resource factory determines whether a resource type is cacheable
 
 ## Automatic Lifetime Management
 
-Resources use **reference counting** to manage their lifetime. When you copy a proxy, the reference count increases. When a proxy goes out of scope or is set to null, the reference count decreases. When the count hits zero, the resource can be unloaded:
+Resources use **reference counting** to manage their lifetime. When you copy a proxy, the reference count increases. When a proxy goes out of scope or is cleared, the reference count decreases. When the count hits zero, the resource can be unloaded:
 
 ```cpp
-// Resource loaded (refCount = 1)
-Proxy<Mesh> mesh1 = resourceManager->load<Mesh>("Meshes/Character");
+// Bind resource (refCount = 1)
+resource::Id<render::Mesh> meshId(Guid(L"{12345678-1234-5678-1234-567812345678}"));
+resource::Proxy<render::Mesh> mesh1;
+resourceManager->bind(meshId, mesh1);
 
 // Share resource (refCount = 2)
-Proxy<Mesh> mesh2 = mesh1;
+resource::Proxy<render::Mesh> mesh2 = mesh1;
 
 // Release reference (refCount = 1)
-mesh2 = nullptr;
+mesh2.clear();  // or mesh2 = resource::Proxy<render::Mesh>();
 
 // Release last reference (refCount = 0, resource may be unloaded)
-mesh1 = nullptr;
+mesh1.clear();
 ```
 
 This is automatic and safe. You never need to manually unload resources. When they're no longer referenced, the system takes care of cleanup.
@@ -191,10 +289,11 @@ You can also manually trigger reloads:
 
 ```cpp
 // Force reload specific resource
-resourceManager->reload(resourceGuid);
+Guid resourceId = Guid(L"{12345678-1234-5678-1234-567812345678}");
+resourceManager->reload(resourceId, false);  // false = reload all, not just flushed
 
-// Reload all resources
-resourceManager->reloadAll();
+// Reload all resources of a specific type
+resourceManager->reload(type_of<render::Shader>(), false);
 ```
 
 ## Extending the Resource System
@@ -228,48 +327,62 @@ The factory tells the resource system how to create instances of your custom typ
 
 The resource system is smart about memory, but you can tune it for your specific needs.
 
-### Resource Budgets
+### Resource Cache Management
 
-Control how much memory the cache uses:
-
-```cpp
-// Set maximum cache size (in MB)
-resourceManager->setMaxCacheSize(512);
-
-// Clear cache to free memory
-resourceManager->releaseUnused();
-```
-
-This is useful on memory-constrained platforms or when transitioning between levels. Clear unused resources to make room for the next batch.
-
-### Preloading Resources
-
-To avoid hitches during gameplay, preload critical resources during loading screens:
+The resource manager automatically caches loaded resources for reuse:
 
 ```cpp
-// Preload level resources
-resourceManager->preload("Levels/Level1");
+// Unload all resources of a specific type
+resourceManager->unload(type_of<render::Texture>());
 
-// Wait for preload to complete
-while (!resourceManager->isPreloadComplete())
-{
-    // Show loading screen
-}
+// Unload externally unused, resident resources
+// Call this to free memory from resources no longer referenced
+resourceManager->unloadUnusedResident();
+
+// Reload a specific resource (hot-reload)
+Guid resourceId = Guid(L"{12345678-1234-5678-1234-567812345678}");
+resourceManager->reload(resourceId, false);  // false = reload all, not just flushed
+
+// Reload all resources of a type
+resourceManager->reload(type_of<render::Shader>(), false);
+
+// Get resource statistics
+ResourceManagerStatistics stats;
+resourceManager->getStatistics(stats);
+log::info << "Resident resources: " << stats.residentCount << Endl;
+log::info << "Exclusive resources: " << stats.exclusiveCount << Endl;
 ```
 
-Preloading loads everything up front so there are no surprises later.
+This is useful when transitioning between levels or when you need to free memory. The cache ensures that shared resources (used by multiple systems) are only loaded once.
 
 ## Best Practices
 
-**Always use Proxies.** Never store raw pointers to resources. Proxies handle reference counting and lazy loading automatically.
+**Always use Proxies.** Never store raw pointers to resources. Proxies handle reference counting automatically and track hot-reload changes.
 
-**Preload critical assets.** Load important resources during loading screens so they're ready when needed.
+**Copy GUIDs from the editor.** Right-click assets in the Database view to copy their GUID for use in code.
 
-**Release unused resources.** Periodically call `releaseUnused()` to free memory from resources no longer referenced.
+**Use Stage transitions for loading.** Let the stage system handle loading entire levels rather than manually binding resources. Stages automatically load all the resources they need during stage transitions.
 
-**Check validity before use.** Always check if a proxy is valid (non-null) before accessing the resource. It might still be loading.
+**Check bind() return value.** Always check if binding succeeded before using the resource:
+```cpp
+resource::Id<render::Mesh> meshId(...);
+resource::Proxy<render::Mesh> meshProxy;
+if (resourceManager->bind(meshId, meshProxy))
+{
+    // Binding successful, resource is loaded
+    render::Mesh* mesh = meshProxy;
+    // Use mesh safely
+}
+else
+{
+    // Binding failed - handle error
+    log::error << "Failed to bind mesh resource" << Endl;
+}
+```
 
-**Use async loading for large assets.** Synchronous loading can freeze your game. Async loading keeps things smooth.
+**Keep proxies alive.** Store proxies as member variables, not temporary variables. If the proxy is destroyed, the resource may be unloaded when the reference count reaches zero.
+
+**Understand binding is synchronous.** `bind()` loads the resource immediately if not already cached. For large resources or level loading, use the stage system's async loading or load during a loading screen.
 
 ## Common Patterns
 
@@ -299,70 +412,90 @@ public:
 };
 ```
 
-### Loading Screen with Progress
+### Loading Between Stages
 
-A common pattern is a loading screen that shows progress while assets load:
+In most cases, you don't manually load resources. The Stage system handles resource loading for you:
 
 ```lua
-import(traktor)
-
-LoadingScreen = LoadingScreen or class("LoadingScreen", world.ScriptComponent)
-
-function LoadingScreen:new()
-    -- Start loading next level
-    self._loader = context.resourceManager:loadAsync("Levels/NextLevel")
-end
-
-function LoadingScreen:update(contextObject, totalTime, deltaTime)
-    if self._loader:isReady() then
-        -- Loading complete, transition to level
-        local level = self._loader:getResource()
-        contextObject.stage:gotoStage(level)
-    else
-        -- Update loading bar
-        local progress = self._loader:getProgress()
-        self:updateLoadingBar(progress)
-    end
-end
-
-function LoadingScreen:updateLoadingBar(progress)
-    -- Update UI with progress
-end
+-- From Lua script - transition to a new stage
+-- The stage system automatically loads all resources needed by that stage
+contextObject.stage:loadStage("MainMenu")
+contextObject.stage:loadStage("Level1")
 ```
 
-This gives players visual feedback and keeps the game responsive during long loads.
+For more control, you can load stages asynchronously and transition when ready:
 
-## Debugging Resources
+```lua
+-- Load stage asynchronously in C++
+Ref<StageLoader> loader = currentStage->loadStageAsync(L"Level1", params);
 
-### Resource Statistics
-
-Check memory usage and loaded resource counts:
-
-```cpp
-// Get resource stats
-ResourceStats stats = resourceManager->getStats();
-
-log::info << "Loaded resources: " << stats.loadedCount << Endl;
-log::info << "Cache size: " << stats.cacheSize << " MB" << Endl;
-log::info << "Peak usage: " << stats.peakUsage << " MB" << Endl;
-```
-
-This helps you track down memory leaks or understand what's consuming memory.
-
-### Listing Loaded Resources
-
-Get a list of all currently loaded resources:
-
-```cpp
-// List all loaded resources
-RefArray<ISerializable> resources = resourceManager->getAllResources();
-for (auto resource : resources)
+// Check if ready in update loop
+if (loader->isReady())
 {
-    log::info << "Resource: " << type_name(resource) << Endl;
+    Ref<Stage> nextStage = loader->getStage();
+    currentStage->gotoStage(nextStage);
 }
 ```
 
-Useful for debugging why resources aren't unloading or finding unexpected resource usage.
+The stage system handles all resource dependencies automatically - when you load a stage, all scenes, textures, meshes, and other resources referenced by that stage are loaded together.
+
+## Debugging Resources
+
+### Resource Tracking
+
+During development, you can track resource loading through logging:
+
+```cpp
+// Log when resources are bound
+resource::Id<render::Mesh> meshId(Guid(L"{12345678-1234-5678-1234-567812345678}"));
+resource::Proxy<render::Mesh> meshProxy;
+if (resourceManager->bind(meshId, meshProxy))
+{
+    log::info << "Successfully bound resource" << Endl;
+}
+else
+{
+    log::error << "Failed to bind resource" << Endl;
+}
+
+// Check if resource is loaded
+if (meshProxy)
+{
+    log::info << "Resource is loaded and ready" << Endl;
+}
+```
+
+### Hot-Reload Verification
+
+To verify hot-reloading is working, you can manually trigger a reload and detect changes:
+
+```cpp
+// Force reload of a specific resource
+Guid resourceId = Guid(L"{12345678-1234-5678-1234-567812345678}");
+resourceManager->reload(resourceId, false);
+log::info << "Triggered reload for resource" << Endl;
+
+// Detect when hot-reload occurs
+if (shaderProxy.changed())
+{
+    log::info << "Shader was hot-reloaded" << Endl;
+    shaderProxy.consume();
+}
+```
+
+The proxy will automatically pick up the new version of the resource.
+
+### Resource Statistics
+
+Monitor resource usage with statistics:
+
+```cpp
+ResourceManagerStatistics stats;
+resourceManager->getStatistics(stats);
+
+log::info << "Resident resources: " << stats.residentCount << Endl;
+log::info << "Exclusive resources: " << stats.exclusiveCount << Endl;
+```
 
 ## See Also
 

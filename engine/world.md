@@ -43,22 +43,29 @@ public:
         render::IRenderSystem* renderSystem
     );
 
+    // Destroy world resources
+    void destroy();
+
+    // World components
+    void setComponent(IWorldComponent* component);
+    IWorldComponent* getComponent(const TypeInfo& componentType) const;
+    template<typename T> T* getComponent() const;
+    const RefArray<IWorldComponent>& getComponents() const;
+
     // Entity management
     void addEntity(Entity* entity);
     void removeEntity(Entity* entity);
+    bool haveEntity(const Entity* entity) const;
 
     // Entity queries
     Entity* getEntity(const Guid& id) const;
     Entity* getEntity(const std::wstring& name, int32_t index = 0) const;
     RefArray<Entity> getEntities(const std::wstring& name) const;
     RefArray<Entity> getEntitiesWithinRange(const Vector4& position, float range) const;
+    const RefArray<Entity>& getEntities() const;
 
     // Update all entities
     void update(const UpdateParams& update);
-
-    // World components
-    void setComponent(IWorldComponent* component);
-    template<typename T> T* getComponent() const;
 };
 ```
 
@@ -77,38 +84,56 @@ public:
         const Guid& id,
         const std::wstring_view& name,
         const Transform& transform,
-        const EntityState& state = EntityState()
+        const EntityState& state = EntityState(),
+        const RefArray<IEntityComponent>& components = RefArray<IEntityComponent>()
     );
 
-    // Transform
-    void setTransform(const Transform& transform);
-    Transform getTransform() const;
+    // Destroy entity resources
+    void destroy();
+
+    // World
+    void setWorld(World* world);
+    World* getWorld() const;
+
+    // Identity
+    const Guid& getId() const;
+    const std::wstring& getName() const;
 
     // State management
+    EntityState setState(const EntityState& state, const EntityState& mask, bool includeChildren);
+    const EntityState& getState() const;
     void setVisible(bool visible);
     bool isVisible() const;
     void setDynamic(bool dynamic);
     bool isDynamic() const;
+    void setLocked(bool locked);
+    bool isLocked() const;
+
+    // Transform
+    void setTransform(const Transform& transform);
+    Transform getTransform() const;
+    Aabb3 getBoundingBox() const;
 
     // Component management
     void setComponent(IEntityComponent* component);
+    IEntityComponent* getComponent(const TypeInfo& componentType) const;
     template<typename T> T* getComponent() const;
     const RefArray<IEntityComponent>& getComponents() const;
 
     // Update
     void update(const UpdateParams& update);
-
-    // Hierarchy
-    const Guid& getId() const;
-    const std::wstring& getName() const;
-    World* getWorld() const;
 };
 ```
+
+**Key Methods:**
+
+- **setState()** - Set entity state with mask and optional children propagation. Returns the previous state.
+- **getBoundingBox()** - Get the combined bounding box of all components in entity space
 
 **Entity State Flags:**
 - **Visible:** Entity is rendered
 - **Dynamic:** Entity can move/change
-- **Locked:** Entity cannot be modified (editor)
+- **Locked:** Entity cannot be modified (editor only)
 
 ### Components
 
@@ -119,17 +144,29 @@ class IEntityComponent : public Object
 {
     virtual void destroy() = 0;
     virtual void setOwner(Entity* owner) = 0;
+    virtual void setWorld(World* world) {}
+    virtual void setState(const EntityState& state, const EntityState& mask, bool includeChildren) {}
     virtual void setTransform(const Transform& transform) = 0;
     virtual Aabb3 getBoundingBox() const = 0;
     virtual void update(const UpdateParams& update) = 0;
 };
 ```
 
+**Component Lifecycle Methods:**
+
+- **destroy()** - Called when the component is destroyed, cleanup resources here
+- **setOwner()** - Called when the component is attached to an entity
+- **setWorld()** - Called when the entity is added to or removed from a world (optional, default is empty)
+- **setState()** - Called when the entity's state changes (visible, dynamic, locked). Optional, default is empty
+- **setTransform()** - Called when the entity's transform is modified
+- **getBoundingBox()** - Returns the component's bounding box in entity space
+- **update()** - Called every frame to update component logic
+
 ## Common Components
 
-### Transform Component
+### Entity Transform (Built-in)
 
-Every entity has a transform (built-in):
+Every entity has a transform as a built-in property (not a component):
 
 ```cpp
 // Set position, rotation, scale
@@ -142,17 +179,21 @@ entity->setTransform(transform);
 
 // Get transform
 Transform current = entity->getTransform();
+
+// Transform is part of Entity itself, not a component
+// Entity stores it directly and notifies all components when it changes
+// via IEntityComponent::setTransform()
 ```
 
 ### Mesh Component
 
-Renders 3D geometry:
+Renders 3D geometry. MeshComponent is an abstract base class - you typically use concrete implementations like StaticMeshComponent:
 
 ```cpp
-Ref<MeshComponent> meshComp = new MeshComponent();
-meshComp->setMesh(meshResource);
-meshComp->setMaterial(materialResource);
-entity->setComponent(meshComp);
+// MeshComponent is abstract - use specific implementations
+// Example: StaticMeshComponent for static geometry
+// Components are typically created through entity factories
+// when loading scenes from the editor
 ```
 
 ### Script Component
@@ -160,9 +201,15 @@ entity->setComponent(meshComp);
 Attaches Lua scripts for behavior:
 
 ```cpp
-Ref<ScriptComponent> scriptComp = new ScriptComponent();
-scriptComp->setScript(scriptResource);
+// ScriptComponent requires a runtime class proxy and properties
+Ref<ScriptComponent> scriptComp = new ScriptComponent(
+    clazz,        // resource::Proxy<IRuntimeClass> - the script class
+    properties    // PropertyGroup* - script properties
+);
 entity->setComponent(scriptComp);
+
+// Scripts are typically attached through the editor
+// by adding ScriptComponentData to entities
 ```
 
 ### Light Component
@@ -170,11 +217,22 @@ entity->setComponent(scriptComp);
 Provides illumination:
 
 ```cpp
-Ref<LightComponent> lightComp = new LightComponent();
-lightComp->setType(LightType::Directional);
-lightComp->setColor(Color4f(1.0f, 1.0f, 1.0f));
-lightComp->setIntensity(1.0f);
+Ref<LightComponent> lightComp = new LightComponent(
+    LightType::Directional,        // Light type
+    Vector4(1.0f, 1.0f, 1.0f),    // Color
+    true,                          // Cast shadow
+    1.0f,                          // Near range
+    100.0f,                        // Far range
+    10.0f,                         // Radius
+    0.0f,                          // Flicker amount
+    0.0f                           // Flicker filter
+);
 entity->setComponent(lightComp);
+
+// You can also modify properties after creation
+lightComp->setLightType(LightType::Point);
+lightComp->setColor(Vector4(1.0f, 0.8f, 0.6f));
+lightComp->setCastShadow(false);
 ```
 
 **Light Types:**
@@ -187,23 +245,40 @@ entity->setComponent(lightComp);
 Adds physics simulation:
 
 ```cpp
-Ref<RigidBodyComponent> bodyComp = new RigidBodyComponent();
-bodyComp->setMass(10.0f);
-bodyComp->setShape(shapeResource);
+// RigidBodyComponent requires a physics Body and event handlers
+Ref<RigidBodyComponent> bodyComp = new RigidBodyComponent(
+    body,             // Body* - physics body (already configured with mass, shape, etc.)
+    eventCollide,     // IEntityEvent* - collision event handler
+    0.5f              // transformFilter - transform smoothing factor
+);
 entity->setComponent(bodyComp);
+
+// The physics Body is typically created through the physics system
+// and configured with mass, shape, and other properties before
+// being passed to the component
 ```
 
-### Audio Component
+### Sound Component
 
-Plays sound effects and music:
+Plays sound effects and music (from Spray module):
 
 ```cpp
-Ref<AudioComponent> audioComp = new AudioComponent();
-audioComp->setSound(soundResource);
-audioComp->setLoop(true);
-audioComp->play();
-entity->setComponent(audioComp);
+// SoundComponent requires a SoundPlayer and Sound resource
+Ref<SoundComponent> soundComp = new SoundComponent(
+    soundPlayer,   // sound::SoundPlayer* - the sound player system
+    soundProxy     // resource::Proxy<sound::Sound> - the sound resource
+);
+entity->setComponent(soundComp);
+
+// Control playback
+soundComp->play();
+soundComp->stop();
+soundComp->setVolume(0.8f);
+soundComp->setPitch(1.2f);
+soundComp->setParameter(L"filter", 0.5f);
 ```
+
+**Note:** Components are typically created through entity factories when loading scenes from the editor, rather than being manually constructed in code. The editor provides a user-friendly interface for configuring component properties.
 
 ## Working with Entities
 
@@ -286,13 +361,69 @@ world->removeEntity(entity);
 
 ## Entity Lifecycle
 
-![TODO: Flowchart showing: Create → Add to World → Update Loop (update components) → Remove from World → Destroy]
+The entity lifecycle follows this sequence (verified from `World.cpp` and `Entity.cpp`):
 
-1. **Create** - Entity is instantiated
-2. **Add to World** - Entity becomes active
-3. **Update** - Components are updated each frame
-4. **Remove from World** - Entity becomes inactive
-5. **Destroy** - Entity resources are cleaned up
+```
+Create → Add to World → Update Loop → Remove from World → Destroy
+```
+
+**1. Create** - Entity constructor is called
+
+```cpp
+Ref<Entity> entity = new Entity(
+    Guid::create(),              // Unique ID
+    L"MyEntity",                 // Name
+    Transform::identity(),       // Initial transform
+    EntityState::All,            // Initial state (visible, dynamic)
+    components                   // Optional: components to attach
+);
+```
+
+Component callbacks: `setOwner()`, `setState()`, `setTransform()`
+
+**2. Add to World** - `world->addEntity(entity)` → `entity->setWorld(world)`
+
+```cpp
+world->addEntity(entity);
+// Internally calls: entity->setWorld(world)
+```
+
+Component callbacks: `setWorld(world)`
+
+**3. Update Loop** - `world->update()` → `entity->update()`
+
+```cpp
+// Called every frame by the world
+world->update(updateParams);
+// Internally: entity->update() for each entity
+```
+
+Component callbacks: `update()` each frame
+
+**4. Remove from World** - `world->removeEntity(entity)` → `entity->setWorld(nullptr)`
+
+```cpp
+world->removeEntity(entity);
+// Internally calls: entity->setWorld(nullptr)
+```
+
+Component callbacks: `setWorld(nullptr)`
+
+**5. Destroy** - `entity->destroy()` (MUST be removed from world first!)
+
+```cpp
+// IMPORTANT: Entity must be removed from world before destroy
+entity->destroy();
+// Fatal assertion fails if entity is still in world!
+```
+
+Component callbacks: `destroy()`
+
+**Important Notes:**
+
+- **Deferred Add/Remove**: If you add or remove entities during `update()`, the operation is deferred until after all entities have been updated (to avoid iterator invalidation)
+- **Must Remove Before Destroy**: `Entity::destroy()` has a fatal assertion `T_FATAL_ASSERT(m_world == nullptr)` - you MUST remove the entity from the world before destroying it
+- **World::destroy()** automatically calls `setWorld(nullptr)` and `destroy()` on all entities
 
 ### Update Cycle
 
@@ -320,20 +451,79 @@ void Entity::update(const UpdateParams& update)
 ```cpp
 struct UpdateParams
 {
-    float totalTime;        // Total elapsed time
-    float deltaTime;        // Frame delta time
-    float simulationDelta;  // Physics simulation delta
-    // ... additional fields
+    Object* contextObject;   // Update context object (Stage instance during runtime)
+    double totalTime;        // Total time since first update
+    double alternateTime;    // Alternative absolute time
+    double deltaTime;        // Delta time since last update
 };
 ```
 
 ## Entity Hierarchy
 
-While Traktor entities don't have built-in parent-child relationships in the traditional scene graph sense, you can implement hierarchies using:
+Traktor implements entity hierarchies through the **GroupComponent**:
 
-1. **Component-based relationships:** Use components to track parent/child
-2. **Transform parenting:** Manually propagate transforms
-3. **Scripting:** Implement custom hierarchy logic in Lua
+```cpp
+class GroupComponent : public IEntityComponent
+{
+public:
+    void addEntity(Entity* entity);
+    void removeEntity(Entity* entity);
+    void removeAllEntities();
+
+    const RefArray<Entity>& getEntities() const;
+    Entity* getEntity(const std::wstring& name, int32_t index) const;
+    RefArray<Entity> getEntities(const std::wstring& name) const;
+};
+```
+
+**How GroupComponent Works:**
+
+1. **Add GroupComponent to parent entity** - The parent entity gets a GroupComponent
+2. **Add child entities** - Child entities are added to the GroupComponent using `addEntity()`
+3. **Automatic transform propagation** - When the parent entity's transform changes:
+   - GroupComponent stores the parent's transform
+   - It calculates each child's local transform relative to the parent
+   - When parent moves, it applies the new parent transform to each child's local transform
+   - Children are updated in world space
+
+4. **State propagation** - When `setState()` is called with `includeChildren = true`, state changes (visible, dynamic, locked) propagate to all children
+
+5. **Bounding box** - GroupComponent computes a combined bounding box of all children in parent space
+
+**Example:**
+
+```cpp
+// Create parent entity with GroupComponent
+Ref<Entity> parent = new Entity(...);
+Ref<GroupComponent> group = new GroupComponent();
+parent->setComponent(group);
+
+// Create child entities
+Ref<Entity> child1 = new Entity(...);
+Ref<Entity> child2 = new Entity(...);
+
+// Add children to the group
+group->addEntity(child1);
+group->addEntity(child2);
+
+// Add parent to world (children should already be in world)
+world->addEntity(parent);
+
+// When parent moves, children move with it automatically
+parent->setTransform(Transform(Vector4(10, 0, 0)));
+// child1 and child2 are automatically updated in world space
+
+// Query children
+Entity* namedChild = group->getEntity(L"ChildName");
+const RefArray<Entity>& allChildren = group->getEntities();
+```
+
+**Important Notes:**
+
+- **Children must be in the world** - Child entities must be added to the world separately via `world->addEntity()`
+- **Local transforms** - GroupComponent maintains the relative transform between parent and children
+- **Transform propagation** - Happens automatically when `setTransform()` is called on the parent
+- **No multi-level nesting shown** - You can nest groups (add entities with GroupComponents as children), creating deep hierarchies
 
 ## Creating Custom Components
 
@@ -381,6 +571,28 @@ public:
         m_owner = owner;
     }
 
+    virtual void setWorld(World* world) override
+    {
+        // Optional: handle world changes
+        // Default implementation in base is empty
+    }
+
+    virtual void setState(const EntityState& state, const EntityState& mask, bool includeChildren) override
+    {
+        // Optional: handle state changes
+        // Default implementation in base is empty
+    }
+
+    virtual void setTransform(const Transform& transform) override
+    {
+        // Handle transform changes
+    }
+
+    virtual Aabb3 getBoundingBox() const override
+    {
+        return Aabb3();
+    }
+
     virtual void update(const UpdateParams& update) override
     {
         // Update logic here
@@ -390,16 +602,6 @@ public:
         Transform t = m_owner->getTransform();
         t.setTranslation(pos);
         m_owner->setTransform(t);
-    }
-
-    virtual Aabb3 getBoundingBox() const override
-    {
-        return Aabb3();
-    }
-
-    virtual void setTransform(const Transform& transform) override
-    {
-        // Handle transform changes
     }
 
 private:
@@ -431,7 +633,7 @@ public:
 
 ## World Components
 
-World components are global systems that operate on the entire world:
+World components are global systems that operate on the entire world. Unlike entity components (which are attached to individual entities), world components are attached to the World itself and provide world-level functionality:
 
 ```cpp
 class IWorldComponent : public Object
@@ -441,32 +643,59 @@ class IWorldComponent : public Object
 };
 ```
 
-**Example: Physics World Component**
+**Available World Components:**
+
+**CullingComponent** (World/Entity) - GPU-driven culling system:
+- Manages instance rendering and visibility culling
+- Builds instance buffers for GPU rendering
+- Handles frustum and occlusion culling
+- Used internally by world renderer
+
+**EventManagerComponent** (World/Entity) - Entity event management:
+- Centralized system for entity events (collision, triggers, etc.)
+- Raises and manages entity event instances
+- Handles event cancellation
+
+**IrradianceGridComponent** (World/Entity) - Global illumination:
+- Stores irradiance grid data for indirect lighting
+- Provides ambient lighting information to renderers
+- One per world for global GI
+
+**RTWorldComponent** (World/Entity) - Ray tracing support:
+- Manages top-level acceleration structure (TLAS) for ray tracing
+- Tracks all ray-traced instances in the world
+- Updates TLAS when instances move
+- Used by ray tracing renderer
+
+**NavMeshComponent** (Ai module) - Navigation mesh:
+- Provides navigation mesh for AI pathfinding
+- One per world, accessible to all AI entities
+- Used by AI pathfinding systems
+
+**TheaterComponent** (Theater module) - Cinematic sequences:
+- Plays cinematic "acts" (sequences of scripted events)
+- Manages timeline-based world events
+- Used for cutscenes and scripted sequences
+
+**Example: Adding a World Component**
 
 ```cpp
-class PhysicsWorldComponent : public IWorldComponent
-{
-public:
-    virtual void update(World* world, const UpdateParams& update) override
-    {
-        // Step physics simulation
-        m_physicsWorld->simulate(update.simulationDelta);
+// Create world with render system and resource manager
+Ref<World> world = new World(resourceManager, renderSystem);
 
-        // Sync entity transforms from physics
-        for (Entity* entity : world->getEntities())
-        {
-            if (RigidBodyComponent* body = entity->getComponent<RigidBodyComponent>())
-            {
-                Transform t = body->getPhysicsTransform();
-                entity->setTransform(t);
-            }
-        }
-    }
+// Add a navigation mesh component
+Ref<NavMeshComponent> navMesh = new NavMeshComponent(navMeshProxy);
+world->setComponent(navMesh);
 
-private:
-    PhysicsWorld* m_physicsWorld;
-};
+// Add an irradiance grid for global illumination
+Ref<IrradianceGridComponent> irradiance = new IrradianceGridComponent(irradianceGridProxy);
+world->setComponent(irradiance);
+
+// Retrieve a world component
+NavMeshComponent* navMeshComp = world->getComponent<NavMeshComponent>();
 ```
+
+**Note:** Most world components are added automatically by the world renderer or through scene data. You rarely need to manually add world components unless building custom rendering or AI systems.
 
 ## Best Practices
 
