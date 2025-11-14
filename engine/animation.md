@@ -99,11 +99,13 @@ function AnimationController:update(contextObject, totalTime, deltaTime)
 
     controller:setParameter("Speed", speed)
     controller:setParameter("Grounded", self._isGrounded)
+end
 
-    -- Trigger state changes
-    if contextObject.input:wasKeyPressed("Space") then
-        controller:trigger("Jump")
-    end
+function AnimationController:jump()
+    -- Trigger state changes (called from Stage based on input)
+    local skeleton = self.owner:getComponent(animation.SkeletonComponent)
+    local controller = skeleton:getPoseController()
+    controller:trigger("Jump")
 end
 ```
 
