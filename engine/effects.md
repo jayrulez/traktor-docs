@@ -409,7 +409,7 @@ Use the editor's effect preview to iterate quickly. You can see and hear changes
 
 - [Render System](render.md) - Effect rendering pipeline
 - [Scripting](scripting.md) - Controlling effects from Lua
-- [Audio System](audio.md) - General audio system (Spray SoundComponent is specialized for effects)
+- [Sound System](sound.md) - Audio system (Spray SoundComponent is specialized for effects)
 
 ## References
 

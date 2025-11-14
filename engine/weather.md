@@ -139,7 +139,7 @@ The Weather module's components are designed to be efficient, but there are stil
 
 - [World System](world.md) - Weather components
 - [Render System](render.md) - Atmospheric rendering and sky
-- [Audio System](audio.md) - Weather sound effects
+- [Sound System](sound.md) - Weather sound effects
 - [Effects](effects.md) - Rain and snow particle effects
 
 ## References
