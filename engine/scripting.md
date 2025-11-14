@@ -42,6 +42,8 @@ end
 
 ### Key Patterns
 
+These patterns show the correct way to use Traktor's Lua API:
+
 | Pattern | Correct | Incorrect |
 |---------|---------|-----------|
 | **Import** | `import(traktor)` at top of script | No import (won't have namespaces) |
@@ -50,7 +52,6 @@ end
 | Transform access | `self.owner.transform` | `self.owner:getTransform()` |
 | Component access | `:getComponent(physics.CharacterComponent)` | `:getComponent("CharacterComponent")` |
 | Constants | `local MAX < const > = 10` | `local MAX = 10` |
-| Member variables | `self._speed` | `self.speed` |
 
 ## The Foundation: Importing Traktor
 
@@ -66,7 +67,7 @@ Without this import, you won't have access to the engine's namespaces like `worl
 
 ## How Scripts Attach to Your Game
 
-In Traktor, scripts become part of your game through the **ScriptComponent**. Think of components as Lego bricks that you attach to entities (game objects). A character entity might have a MeshComponent to make it visible, a PhysicsComponent to make it collide with things, and a ScriptComponent to make it behave intelligently.
+In Traktor, scripts become part of your game through the **ScriptComponent**. Think of components as Lego bricks that you attach to entities (game objects). A character entity might have a MeshComponent to make it visible, a RigidBodyComponent to make it collide with things, and a ScriptComponent to make it behave intelligently.
 
 Here's how scripts are attached:
 
@@ -159,16 +160,14 @@ Input is typically handled through an input mapping in a Stage class:
 
 ```lua
 -- In a Stage class
-function Stage:new()
-    -- Initialize input mapping
-    self._inputMapping = input.InputMappingSourceInstance(
-        resource.load(
-            resource.Id("Id-of-input-mapping")
-        )
-    )
+function GameStage:new(params, environment)
+    Stage.new(self, params, environment)
+
+    -- Get input mapping from environment
+    self._inputMapping = environment.input.inputMapping
 end
 
-function Stage:update(contextObject, totalTime, deltaTime)
+function GameStage:update(contextObject, totalTime, deltaTime)
     -- Check button/key states
     local escape = self._inputMapping:isStatePressed("STATE_ESCAPE")
     local jump = self._inputMapping:isStatePressed("STATE_JUMP")
@@ -337,44 +336,142 @@ end
 
 ### Exposing C++ Classes
 
-Use the binding system to expose C++ functionality:
+C++ classes are automatically exposed to Lua through **ClassFactory** implementations. Each module defines a ClassFactory that uses `AutoRuntimeClass` to register classes, methods, properties, and constructors.
+
+**Example ClassFactory implementation:**
 
 ```cpp
-// In C++ - Expose class to Lua
-T_IMPLEMENT_RTTI_FACTORY_CLASS(L"MyClass", 0, MyClass, ITypedObject)
+// MyModuleClassFactory.h
+#pragma once
 
-void MyClass::bind(lua_State* L)
+#include "Core/Class/IRuntimeClassFactory.h"
+
+namespace mymodule
 {
-    // Bind methods
-    luaL_Reg methods[] = {
-        { "doSomething", &MyClass::lua_doSomething },
-        { nullptr, nullptr }
-    };
-    registerClass(L, "MyClass", methods);
+
+class MyModuleClassFactory : public traktor::IRuntimeClassFactory
+{
+    T_RTTI_CLASS;
+
+public:
+    virtual void createClasses(traktor::IRuntimeClassRegistrar* registrar) const override;
+};
+
 }
 
-int MyClass::lua_doSomething(lua_State* L)
+// MyModuleClassFactory.cpp
+#include "Core/Class/AutoRuntimeClass.h"
+#include "Core/Class/IRuntimeClassRegistrar.h"
+#include "MyModule/MyModuleClassFactory.h"
+#include "MyModule/MyClass.h"
+
+namespace mymodule
 {
-    // Get 'self' from Lua
-    MyClass* self = getObject<MyClass>(L, 1);
 
-    // Get parameters
-    int param = lua_tointeger(L, 2);
+T_IMPLEMENT_RTTI_FACTORY_CLASS(L"mymodule.MyModuleClassFactory", 0, MyModuleClassFactory, IRuntimeClassFactory)
 
-    // Call C++ method
-    int result = self->doSomething(param);
+void MyModuleClassFactory::createClasses(IRuntimeClassRegistrar* registrar) const
+{
+    // Create runtime class wrapper
+    auto classMyClass = new AutoRuntimeClass< MyClass >();
 
-    // Return result
-    lua_pushinteger(L, result);
-    return 1;  // Number of return values
+    // Add constructor
+    classMyClass->addConstructor();
+
+    // Add properties (getter/setter)
+    classMyClass->addProperty("name", &MyClass::setName, &MyClass::getName);
+    classMyClass->addProperty("value", &MyClass::setValue, &MyClass::getValue);
+
+    // Add read-only property (getter only)
+    classMyClass->addProperty("count", &MyClass::getCount);
+
+    // Add methods
+    classMyClass->addMethod("doSomething", &MyClass::doSomething);
+    classMyClass->addMethod("calculate", &MyClass::calculate);
+
+    // Add constants
+    classMyClass->addConstant("MAX_VALUE", Any::fromInt32(100));
+    classMyClass->addConstant("DEFAULT_NAME", Any::fromString(L"Default"));
+
+    // Register the class
+    registrar->registerClass(classMyClass);
+}
+
 }
 ```
+
+**Class implementation with Lua-compatible methods:**
+
+```cpp
+// MyClass.h
+#pragma once
+
+#include "Core/Object.h"
+#include "Core/Ref.h"
+
+namespace mymodule
+{
+
+class MyClass : public traktor::Object
+{
+    T_RTTI_CLASS;
+
+public:
+    MyClass() = default;
+
+    void setName(const std::wstring& name) { m_name = name; }
+    std::wstring getName() const { return m_name; }
+
+    void setValue(int32_t value) { m_value = value; }
+    int32_t getValue() const { return m_value; }
+
+    int32_t getCount() const { return m_count; }
+
+    int32_t doSomething(int32_t param);
+    float calculate(float a, float b);
+
+private:
+    std::wstring m_name = L"";
+    int32_t m_value = 0;
+    int32_t m_count = 0;
+};
+
+}
+```
+
+**Using the exposed class from Lua:**
 
 ```lua
--- In Lua - Use bound class
-local obj = MyClass()
-local result = obj:doSomething(42)
+import(traktor)
+
+-- Create instance using constructor
+local obj = mymodule.MyClass()
+
+-- Set properties
+obj.name = "MyObject"
+obj.value = 42
+
+-- Get properties
+log:info("Name: " .. obj.name)
+log:info("Value: " .. tostring(obj.value))
+log:info("Count: " .. tostring(obj.count))
+
+-- Call methods
+local result = obj:doSomething(10)
+local calculated = obj:calculate(5.0, 3.0)
+
+-- Access constants
+local maxValue = mymodule.MyClass.MAX_VALUE
 ```
+
+**Key points:**
+- `addConstructor()` - Exposes constructor to Lua
+- `addProperty(name, setter, getter)` - Property with get/set
+- `addProperty(name, getter)` - Read-only property
+- `addMethod(name, &Class::method)` - Exposes method
+- `addConstant(name, value)` - Class constant
+- Methods must use types Lua understands (int32_t, float, std::wstring, Ref<>, etc.)
+- All classes automatically work with Lua's garbage collection through reference counting
 
 ## Debugging
 
@@ -567,11 +664,11 @@ import(traktor)
 
 GameStage = GameStage or class("GameStage", world.Stage)
 
-function GameStage:new()
-    -- Load input mapping
-    self._inputMapping = input.InputMappingSourceInstance(
-        resource.load(resource.Id("game-input-mapping-id"))
-    )
+function GameStage:new(params, environment)
+    Stage.new(self, params, environment)
+
+    -- Get input mapping from environment
+    self._inputMapping = environment.input.inputMapping
 
     -- Initialize game state
     self._playerEntity = nil
@@ -805,7 +902,6 @@ end
 9. **Handle Nil:** Always check for nil before using components
 10. **Clean Up:** Release resources in `destroy()`
 11. **Profile:** Measure before optimizing
-12. **Use Underscore for Members:** Prefix member variables with underscore (e.g., `self._speed`)
 
 ## See Also
 
