@@ -17,35 +17,66 @@ Think of the input system as the translator that turns physical button presses i
 
 ## Accessing Input in Your Scripts
 
-From Lua scripts, input is accessed through the `contextObject` passed to your update function. This gives you a snapshot of input state for the current frame:
+**IMPORTANT:** Input is only accessible in **Stage** classes, NOT in ScriptComponents. ScriptComponents receive data from the Stage, but cannot access input directly.
+
+### Using InputMapping (Recommended)
+
+The recommended approach is to use **InputMapping** in Stage classes, which provides a high-level abstraction over raw input devices:
 
 ```lua
 import(traktor)
 
-InputExample = InputExample or class("InputExample", world.ScriptComponent)
+GameStage = GameStage or class("GameStage", world.Stage)
 
-function InputExample:update(contextObject, totalTime, deltaTime)
-    local input = contextObject.input
+function GameStage:new(params, environment)
+    Stage.new(self, params, environment)
 
-    -- Keyboard
-    if input:isKeyDown("W") then
+    -- Get input mapping from environment
+    self._inputMapping = environment.input.inputMapping
+end
+
+function GameStage:update(contextObject, totalTime, deltaTime)
+    -- Check mapped states
+    if self._inputMapping:isStatePressed("STATE_JUMP") then
+        -- Jump
+    end
+
+    -- Get analog values
+    local moveX = self._inputMapping:getStateValue("MOVE_X")
+    local moveZ = self._inputMapping:getStateValue("MOVE_Z")
+end
+```
+
+### Using Raw Input (Alternative)
+
+You can also access raw input by storing it from the environment in the constructor:
+
+```lua
+function GameStage:new(params, environment)
+    Stage.new(self, params, environment)
+
+    -- Store input from environment
+    self._input = environment.input
+end
+
+function GameStage:update(contextObject, totalTime, deltaTime)
+    -- Use stored input member
+    -- Check keyboard
+    if self._input:isKeyDown("W") then
         -- Move forward
     end
 
-    -- Mouse
-    local mousePos = input:getMousePosition()
-    if input:isMouseButtonDown(0) then  -- Left button
-        -- Fire weapon
-    end
+    -- Check mouse
+    local mousePos = self._input:getMousePosition()
 
-    -- Gamepad
-    if input:isButtonDown(0, "A") then  -- Controller 0, A button
-        -- Jump
+    -- Check gamepad
+    if self._input:isGamepadConnected(0) then
+        local stickX = self._input:getAxisValue(0, "LeftStickX")
     end
 end
 ```
 
-From C++, you access the input server directly:
+From C++, you access the input server directly through the environment:
 
 ```cpp
 IInputServer* inputServer = environment->getInputServer();
@@ -65,105 +96,29 @@ if (state.isMouseButtonDown(0))
 }
 ```
 
-## Keyboard Input: Pressed, Held, or Released?
+## InputMapping API
 
-Keyboard input has three states that matter: **currently pressed** (held down), **just pressed** (this frame only), and **just released** (this frame only). Understanding the difference is critical for responsive controls.
-
-```lua
--- Check if key is currently pressed
-if input:isKeyDown("W") then end
-if input:isKeyDown("Escape") then end
-
--- Check if key was just pressed this frame
-if input:wasKeyPressed("Space") then
-    -- Jump (only once per press)
-end
-
--- Check if key was just released
-if input:wasKeyReleased("Ctrl") then end
-
--- Special keys
-input:isKeyDown("Shift")
-input:isKeyDown("Ctrl")
-input:isKeyDown("Alt")
-input:isKeyDown("Enter")
-input:isKeyDown("Escape")
-```
-
-**isKeyDown** is for continuous actions like movement. While W is held, keep moving forward. **wasKeyPressed** is for discrete actions like jumping. You want to jump once per press, not every frame while the button is held. **wasKeyReleased** is for actions that happen when you let go, like releasing a charged shot.
-
-## Mouse Input: Position, Movement, and Clicks
-
-Mouse input combines position tracking, button states, and scroll wheel input. For camera control, you typically use **mouse delta** (how much the mouse moved this frame) rather than absolute position:
+The **InputMapping** provides the following methods for querying input states:
 
 ```lua
--- Mouse position (screen coordinates)
-local pos = input:getMousePosition()  -- Vector2
-local x = pos.x
-local y = pos.y
+-- State queries (for buttons/keys)
+local isDown = self._inputMapping:isStateDown("STATE_JUMP")          -- Currently held
+local isUp = self._inputMapping:isStateUp("STATE_JUMP")              -- Currently not held
+local pressed = self._inputMapping:isStatePressed("STATE_JUMP")      -- Just pressed this frame
+local released = self._inputMapping:isStateReleased("STATE_JUMP")    -- Just released this frame
+local changed = self._inputMapping:hasStateChanged("STATE_JUMP")     -- Changed this frame
 
--- Mouse movement delta
-local delta = input:getMouseDelta()
+-- Analog values (for sticks/axes)
+local value = self._inputMapping:getStateValue("MOVE_X")             -- Current value (-1.0 to 1.0)
+local prevValue = self._inputMapping:getStatePreviousValue("MOVE_X") -- Previous frame value
 
--- Mouse buttons (0 = left, 1 = right, 2 = middle)
-if input:isMouseButtonDown(0) then end       -- Currently pressed
-if input:wasMouseButtonPressed(1) then end   -- Just pressed
-if input:wasMouseButtonReleased(2) then end  -- Just released
-
--- Mouse wheel
-local scroll = input:getMouseWheel()  -- Positive = up, Negative = down
+-- Other methods
+self._inputMapping:reset()                                            -- Reset all states
+self._inputMapping:setValue("CUSTOM_STATE", value)                    -- Set custom state value
+local idleDuration = self._inputMapping:getIdleDuration()             -- Time since last input
 ```
 
-**Mouse delta** is perfect for first-person camera controls. It tells you how many pixels the mouse moved since last frame, which you can use to rotate the camera smoothly. Using absolute position would feel jumpy and unnatural.
-
-The **mouse wheel** value resets each frame, so you read it as "scrolled up this frame" or "scrolled down this frame," perfect for weapon switching or zooming.
-
-## Gamepad Input: Buttons and Analog Sticks
-
-Gamepads provide buttons, analog sticks, and triggers. The system follows Xbox controller layout by default, which maps well to most modern controllers:
-
-```lua
--- Check gamepad connection
-if input:isGamepadConnected(0) then  -- Controller 0
-
-    -- Buttons (Xbox layout)
-    if input:isButtonDown(0, "A") then end
-    if input:isButtonDown(0, "B") then end
-    if input:isButtonDown(0, "X") then end
-    if input:isButtonDown(0, "Y") then end
-
-    -- Triggers
-    if input:isButtonDown(0, "LeftTrigger") then end
-    if input:isButtonDown(0, "RightTrigger") then end
-
-    -- Bumpers
-    if input:isButtonDown(0, "LeftBumper") then end
-    if input:isButtonDown(0, "RightBumper") then end
-
-    -- D-Pad
-    if input:isButtonDown(0, "DPadUp") then end
-    if input:isButtonDown(0, "DPadDown") then end
-
-    -- Analog sticks (-1.0 to 1.0)
-    local leftX = input:getAxisValue(0, "LeftStickX")
-    local leftY = input:getAxisValue(0, "LeftStickY")
-    local rightX = input:getAxisValue(0, "RightStickX")
-    local rightY = input:getAxisValue(0, "RightStickY")
-
-    -- Triggers as analog (0.0 to 1.0)
-    local leftTrigger = input:getAxisValue(0, "LeftTrigger")
-    local rightTrigger = input:getAxisValue(0, "RightTrigger")
-
-    -- Vibration
-    input:setVibration(0, 0.5, 0.5)  -- Controller 0, left motor, right motor
-end
-```
-
-Always check if a gamepad is connected before reading its input. Players can connect and disconnect controllers at any time, and reading from a disconnected controller gives you zeroes.
-
-**Analog sticks** return values from -1.0 to 1.0 on each axis. You should apply a **dead zone** (ignoring small values near zero) to prevent stick drift from causing unwanted movement. A typical dead zone is around 0.1 to 0.2.
-
-**Vibration** (rumble) provides force feedback. Use it sparingly. Subtle rumble on impacts and explosions adds immersion, but constant rumble is annoying and drains battery.
+**Note:** InputMapping states are defined in the editor and automatically updated by the engine. You only need to query them.
 
 ## Input Mapping: Flexibility for Players
 
@@ -182,129 +137,17 @@ Hardcoding keys in your game scripts is a mistake. Different players prefer diff
 In your scripts, check for actions instead of specific keys:
 
 ```lua
--- Use mapped actions
-if input:isActionActive("Forward") then
-    -- Move forward (works with W, Up arrow, or left stick)
+-- Use mapped states in Stage update
+if self._inputMapping:isStatePressed("STATE_JUMP") then
+    -- Jump (works with any configured input)
 end
 
-if input:wasActionTriggered("Jump") then
-    -- Jump (works with Space or A button)
-end
+-- Get analog values
+local moveX = self._inputMapping:getStateValue("MOVE_X")
+local moveZ = self._inputMapping:getStateValue("MOVE_Z")
 ```
 
 Now players can remap controls without you changing any code. You can even provide multiple default mappings for different play styles, and let players customize them in an options menu.
-
-## Touch Input for Mobile
-
-On touch-enabled devices, input comes from touches on the screen. Each touch has a unique ID that persists across frames, so you can track individual fingers:
-
-```lua
--- Get touch count
-local touchCount = input:getTouchCount()
-
-for i = 0, touchCount - 1 do
-    local touch = input:getTouch(i)
-
-    -- Touch ID (persistent across frames)
-    local id = touch.id
-
-    -- Touch position
-    local pos = touch.position  -- Vector2
-
-    -- Touch state
-    if touch.state == "Began" then
-        -- Touch started
-    elseif touch.state == "Moved" then
-        -- Touch moved
-    elseif touch.state == "Ended" then
-        -- Touch ended
-    end
-end
-```
-
-Touch input is great for mobile games, but you typically combine it with virtual on-screen buttons or joysticks for intuitive controls.
-
-## Common Patterns
-
-### Character Movement
-
-A typical character movement system combines keyboard and gamepad input, with gamepad overriding keyboard when available:
-
-```lua
-import(traktor)
-
-CharacterMovement = CharacterMovement or class("CharacterMovement", world.ScriptComponent)
-
-function CharacterMovement:new()
-    self._speed = 5.0
-end
-
-function CharacterMovement:update(contextObject, totalTime, deltaTime)
-    local input = contextObject.input
-    local moveDir = Vector4(0, 0, 0)
-
-    -- Keyboard
-    if input:isKeyDown("W") then moveDir.z = moveDir.z - 1 end
-    if input:isKeyDown("S") then moveDir.z = moveDir.z + 1 end
-    if input:isKeyDown("A") then moveDir.x = moveDir.x - 1 end
-    if input:isKeyDown("D") then moveDir.x = moveDir.x + 1 end
-
-    -- Gamepad (overrides keyboard)
-    if input:isGamepadConnected(0) then
-        local x = input:getAxisValue(0, "LeftStickX")
-        local y = input:getAxisValue(0, "LeftStickY")
-        if math.abs(x) > 0.1 or math.abs(y) > 0.1 then  -- Dead zone
-            moveDir = Vector4(x, 0, -y)
-        end
-    end
-
-    -- Normalize and apply
-    if moveDir:length() > 0 then
-        moveDir = moveDir:normalized()
-        local character = self.owner:getComponent(physics.CharacterComponent)
-        character:move(moveDir * self._speed, false)
-    end
-end
-```
-
-Notice the **dead zone check** (0.1) on the analog stick. Without it, even slight stick drift causes unwanted movement.
-
-### Camera Look with Mouse
-
-For first-person camera controls, use mouse delta and track yaw/pitch:
-
-```lua
-import(traktor)
-
-CameraLook = CameraLook or class("CameraLook", world.ScriptComponent)
-
-function CameraLook:new()
-    self._yaw = 0
-    self._pitch = 0
-    self._sensitivity = 0.1
-end
-
-function CameraLook:update(contextObject, totalTime, deltaTime)
-    local input = contextObject.input
-
-    -- Mouse look
-    local mouseDelta = input:getMouseDelta()
-
-    self._yaw = self._yaw + mouseDelta.x * self._sensitivity
-    self._pitch = self._pitch - mouseDelta.y * self._sensitivity
-    self._pitch = math.max(-89, math.min(89, self._pitch))  -- Clamp
-
-    -- Apply rotation
-    local rotation = Quaternion.fromEulerAngles(
-        math.rad(self._pitch),
-        math.rad(self._yaw),
-        0
-    )
-    -- ... apply to camera
-end
-```
-
-**Clamping pitch** prevents the camera from flipping upside down when looking straight up or down. Most games clamp pitch to around -89 to +89 degrees.
 
 ## Best Practices
 
@@ -326,14 +169,13 @@ end
 
 ## Debugging Input
 
-When input doesn't work as expected, log the input state:
+When input doesn't work as expected, log the input mapping state:
 
 ```lua
--- Debug input
-log:info("Key W down: " .. tostring(input:isKeyDown("W")))
-log:info("Mouse position: " .. tostring(input:getMousePosition()))
-log:info("Gamepad 0 connected: " .. tostring(input:isGamepadConnected(0)))
-log:info("Left stick X: " .. input:getAxisValue(0, "LeftStickX"))
+-- Debug input mapping states in Stage
+log:info("STATE_JUMP pressed: " .. tostring(self._inputMapping:isStatePressed("STATE_JUMP")))
+log:info("MOVE_X value: " .. tostring(self._inputMapping:getStateValue("MOVE_X")))
+log:info("MOVE_Z value: " .. tostring(self._inputMapping:getStateValue("MOVE_Z")))
 ```
 
 Common issues:

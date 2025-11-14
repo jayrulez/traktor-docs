@@ -156,10 +156,12 @@ end
 
 ### Input
 
-Input is typically handled through an input mapping in a Stage class:
+**IMPORTANT:** Input is only accessible in **Stage** classes. ScriptComponents do NOT have access to input - they receive game state and commands from the Stage.
+
+Input can be handled through InputMapping or raw input in Stage classes:
 
 ```lua
--- In a Stage class
+-- In a Stage class - Using InputMapping
 function GameStage:new(params, environment)
     Stage.new(self, params, environment)
 
@@ -175,8 +177,33 @@ function GameStage:update(contextObject, totalTime, deltaTime)
     -- Get analog axis values
     local moveZ = self._inputMapping:getStateValue("MOVE_Z")
     local moveX = self._inputMapping:getStateValue("MOVE_X")
-    local lookX = self._inputMapping:getStateValue("LOOK_X")
-    local lookY = self._inputMapping:getStateValue("LOOK_Y")
+end
+```
+
+Or using raw input:
+
+```lua
+-- In a Stage class - Using raw input
+function GameStage:new(params, environment)
+    Stage.new(self, params, environment)
+
+    -- Store input from environment
+    self._input = environment.input
+end
+
+function GameStage:update(contextObject, totalTime, deltaTime)
+    -- Check keyboard
+    if self._input:isKeyDown("W") then
+        -- Move forward
+    end
+
+    -- Check mouse
+    local mousePos = self._input:getMousePosition()
+
+    -- Check gamepad
+    if self._input:isGamepadConnected(0) then
+        local stickX = self._input:getAxisValue(0, "LeftStickX")
+    end
 end
 ```
 
@@ -578,84 +605,7 @@ Move performance-critical code to C++ components.
 
 ## Complete Examples
 
-### Character Controller Script
-
-```lua
-import(traktor)
-
-PlayerController = PlayerController or class("PlayerController", world.ScriptComponent)
-
--- Constants
-local MOVE_SPEED < const > = 5.0
-local TURN_SPEED < const > = 2.0
-
-function PlayerController:new()
-    -- Cache component references
-    self._characterComponent = self.owner:getComponent(physics.CharacterComponent)
-    self._skeletonComponent = self.owner:getComponent(animation.SkeletonComponent)
-
-    -- Initialize state
-    self._moveVector = Vector4(0, 0, 0)
-    self._headAngle = 0.0
-end
-
-function PlayerController:update(contextObject, totalTime, deltaTime)
-    if not self._characterComponent then
-        return
-    end
-
-    -- Get input (assuming input mapping is passed via context)
-    local moveX = contextObject.input:getStateValue("MOVE_X")
-    local moveZ = contextObject.input:getStateValue("MOVE_Z")
-    local lookX = contextObject.input:getStateValue("LOOK_X")
-
-    -- Update movement
-    self._moveVector.x = moveX * MOVE_SPEED
-    self._moveVector.z = moveZ * MOVE_SPEED
-    self._characterComponent:move(self._moveVector, false)
-
-    -- Update head rotation
-    self._headAngle = self._headAngle + lookX * TURN_SPEED * deltaTime
-    self._characterComponent.headAngle = self._headAngle
-
-    -- Jump
-    if contextObject.input:isStatePressed("STATE_JUMP") then
-        self._characterComponent:jump()
-    end
-end
-```
-
-### Vehicle Controller Script
-
-```lua
-import(traktor)
-
-VehicleController = VehicleController or class("VehicleController", world.ScriptComponent)
-
--- Constants
-local MAX_STEER_ANGLE < const > = 30.0
-local MAX_SPEED < const > = 50.0
-
-function VehicleController:new()
-    self._vehicleComponent = self.owner:getComponent(physics.VehicleComponent)
-end
-
-function VehicleController:update(contextObject, totalTime, deltaTime)
-    if not self._vehicleComponent then
-        return
-    end
-
-    -- Get input values
-    local steer = contextObject.input:getStateValue("STEER")
-    local throttle = contextObject.input:getStateValue("THROTTLE")
-    local brake = contextObject.input:getStateValue("BRAKE")
-
-    -- Apply to vehicle
-    self._vehicleComponent.steerAngle = steer * MAX_STEER_ANGLE
-    self._vehicleComponent.engineThrottle = throttle
-    self._vehicleComponent.maxVelocity = MAX_SPEED
-end
-```
+**Note:** ScriptComponents do NOT have access to input. Input is only accessible in Stage classes by storing `environment.input` or `environment.input.inputMapping` in the constructor. ScriptComponents respond to game state and commands passed from the Stage.
 
 ### Stage Class Example
 
@@ -676,9 +626,6 @@ function GameStage:new(params, environment)
 end
 
 function GameStage:update(contextObject, totalTime, deltaTime)
-    -- Update input
-    self._inputMapping:update(deltaTime, contextObject.input, nil)
-
     -- Find player if not cached
     if not self._playerEntity then
         self._playerEntity = self.world.world:getEntity("Player")
