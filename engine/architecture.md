@@ -11,7 +11,7 @@ nav_order: 1
 
 Welcome to the heart of Traktor! Understanding the engine's architecture will help you make better decisions when building your games and tools. This guide explains how Traktor is organized and why it's designed this way.
 
-![Traktor Architecture Diagram](/images/traktor-architecture.jpg)
+![Traktor Architecture Diagram](../images/traktor-architecture.png)
 
 ## The Big Picture
 
