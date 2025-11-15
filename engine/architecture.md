@@ -11,7 +11,7 @@ nav_order: 1
 
 Welcome to the heart of Traktor! Understanding the engine's architecture will help you make better decisions when building your games and tools. This guide explains how Traktor is organized and why it's designed this way.
 
-![TODO: Diagram showing the modular architecture with Core at the base, Runtime/World/Resource layer in the middle, and specialized systems (Render, Physics, Audio, Script) at the top]
+![Traktor Architecture Diagram](/images/traktor-architecture.jpg)
 
 ## The Big Picture
 
@@ -27,66 +27,24 @@ The architecture is designed around four key principles:
 
 **Maintainability** is about writing code that future you will thank current you for. Consistent naming, clear dependencies, and good documentation mean you can come back to code months later and still understand it.
 
-## Understanding the Five Layers
+## Understanding the Layered Architecture
 
-Traktor's architecture resembles a building with a strong foundation and increasingly specialized floors. Let's explore each layer, starting from the bottom and working our way up.
-
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                          Applications (Layer 8)                        │
-│  Editor.App  Runtime.App  Pipeline.App  SolutionBuilder.App  Run.App  │
-└────────────────────────────────────────────────────────────────────────┘
-                                     ▲
-┌────────────────────────────────────────────────────────────────────────┐
-│                        Editor Modules (Layer 7)                        │
-│  Render.Editor  World.Editor  Animation.Editor  Physics.Editor  etc.  │
-└────────────────────────────────────────────────────────────────────────┘
-                                     ▲
-┌────────────────────────────────────────────────────────────────────────┐
-│                        Editor Framework (Layer 6)                      │
-│                               Editor                                   │
-└────────────────────────────────────────────────────────────────────────┘
-                                     ▲
-┌────────────────────────────────────────────────────────────────────────┐
-│                        Runtime System (Layer 5)                        │
-│                              Runtime                                   │
-│    (Orchestrates all game systems through server architecture)        │
-└────────────────────────────────────────────────────────────────────────┘
-                                     ▲
-┌────────────────────────────────────────────────────────────────────────┐
-│                   High-Level Game Systems (Layer 4)                    │
-│  Mesh  Animation  Spray  Weather  Terrain  Theater  Ai  Online  Spark │
-└────────────────────────────────────────────────────────────────────────┘
-                                     ▲
-┌────────────────────────────────────────────────────────────────────────┐
-│                    World and Physics (Layer 3)                         │
-│                 World  Physics  Scene                                  │
-└────────────────────────────────────────────────────────────────────────┘
-                                     ▲
-┌────────────────────────────────────────────────────────────────────────┐
-│                       Core Systems (Layer 2)                           │
-│  Database  Render  Sound  Input  Script  Ui  Model  Video  Heightfield│
-└────────────────────────────────────────────────────────────────────────┘
-                                     ▲
-┌────────────────────────────────────────────────────────────────────────┐
-│                    Low-Level Utilities (Layer 1)                       │
-│  Compress  Xml  Net  Sql  Drawing  Resource  I18N  Html  Json  Svg    │
-└────────────────────────────────────────────────────────────────────────┘
-                                     ▲
-┌────────────────────────────────────────────────────────────────────────┐
-│                          Foundation (Layer 0)                          │
-│                                Core                                    │
-│   (Object system, RTTI, math, threading, I/O, containers, memory)     │
-└────────────────────────────────────────────────────────────────────────┘
-```
+Traktor's architecture resembles a building with a strong foundation and increasingly specialized floors. The diagram above shows how the engine is organized into layers, starting from the bottom and working up.
 
 **Dependency Rules:**
 - Each layer can only depend on layers below it
 - No circular dependencies between modules
-- Editor modules (.Editor suffix) separate from runtime code
+- **Layer 2 (Specialized Systems)** builds on Layers 0-1 and provides all game engine subsystems
+- **Layer 3 has three parallel branches:**
+  - **Runtime Framework** - Game orchestration (builds on Layer 2 specialized systems)
+  - **Editor Framework** - Authoring tools and asset pipeline (builds on Layers 0-2)
+  - **Standalone Applications** - Utility apps like Run.App, SolutionBuilder.App (build on Layers 0-2)
+- **Runtime.App** builds on the Runtime framework
+- **Editor applications** (Editor.App, Pipeline.App) build on the Editor framework
+- Editor modules (.Editor suffix) extend the Editor framework but are separate from runtime code
 - Core has zero dependencies - it's the foundation for everything
 
-### Layer 1: Core - The Foundation
+### Layer 0: Core - The Foundation
 
 Everything starts with the **Core** module. This is the bedrock that all other systems build upon, providing the fundamental services that make a game engine possible.
 
@@ -131,23 +89,23 @@ log::warning << "Texture quality reduced due to memory constraints" << Endl;
 log::error << "Failed to initialize audio device" << Endl;
 ```
 
-### Layer 2: General Purpose Modules
+### Layers 1-2: Building Blocks
 
-Built on top of Core are the general-purpose modules. These are reusable systems that both the runtime (your game) and the editor can use. They're called "general" because they don't assume anything about whether they're running in development or in a shipped game.
+Built on top of Core are the general-purpose modules organized into increasingly specialized layers. These modules are reusable by both the runtime (your game) and the editor. They don't assume anything about whether they're running in development or in a shipped game.
 
-This layer is where things get interesting. It includes specialized systems that form the building blocks of games:
+**Layer 1 (Low-Level Utilities)** provides foundational services like compression, XML/JSON parsing, networking, SQL database access, 2D drawing, resource management, internationalization, and vector graphics. These are the basic tools that higher layers depend on.
 
-The **Animation** module handles skeletal animation, inverse kinematics (IK), ragdoll physics, and cloth simulation. The **Physics** module provides rigid body dynamics and character controllers using either Jolt or Bullet as the backend. The **Render** module implements the Vulkan-based rendering pipeline with support for modern features like ray tracing.
+**Layer 2 (Specialized Systems)** provides all the major subsystems needed for game and application development. This includes **Database** for asset storage, **Render** for Vulkan-based graphics, **Sound** for multi-channel audio, **Input** for devices, **Ui** for windowing and controls, **Model** for 3D model data, and **Video** for playback. The entity-component system (**World**) implements the pattern that ties everything together—entities are game objects, and components define their behavior and appearance. **Physics** provides simulation and collision detection, while **Scene** manages scene graphs and rendering hierarchies. **Script** enables Lua integration for gameplay programming. **Heightfield** provides terrain data structures. Specialized game systems like **Mesh** (rendering), **Animation** (skeletal, IK, ragdoll, cloth), **Spray** (GPU particles and effects with sound), **Weather** (sky and precipitation), **Terrain** (large outdoor environments), **Theater** (cutscenes), **Ai** (pathfinding), **Online** (multiplayer), and **Spark** (in-game UI) round out the game development toolkit.
 
-The **World** module is particularly important. It implements the entity-component system that ties everything together. Entities are game objects, and components define their behavior and appearance. This pattern keeps code modular and makes it easy to compose different behaviors.
+Each module can exist in up to three variants: the base general-purpose code, editor-specific extensions (.Editor suffix), and platform-specific implementations. This keeps editor tools separate from runtime code, ensuring your game stays lean.
 
-Other key modules include **Resource** for asset loading, **Script** for Lua integration, **Sound** for multi-channel audio, **Spark** (which powers the in-game UI system), **Spray** for GPU-accelerated particle effects, **Terrain** for large outdoor environments, **Theater** for cinematic cutscenes, and **Weather** for dynamic sky and precipitation systems.
+### Layer 3: Runtime and Editor Frameworks (Parallel)
 
-Each module can exist in up to three variants: the base general-purpose code, editor-specific extensions, and runtime-specific extensions. This keeps editor tools separate from runtime code, ensuring your game stays lean.
+At Layer 3, the architecture splits into two **parallel frameworks**: Runtime (for games) and Editor (for authoring). Both build on the same foundation (Layers 0-2) but serve different purposes and remain independent.
 
-### Layer 3: Runtime Framework
+#### Runtime Framework
 
-The **Runtime** layer is where your game lives. It orchestrates all the general modules through a server-based architecture.
+The **Runtime** framework is where your game lives. It orchestrates all the general modules through a server-based architecture.
 
 The runtime defines an **Application** class that manages the game's lifecycle. Different subsystems are implemented as "servers" that get initialized, updated, and shut down in a controlled manner:
 
@@ -164,9 +122,9 @@ This server pattern gives you clean extension points. Want to add telemetry? Cre
 
 The runtime also introduces **States** (sometimes called Stages in the codebase). States represent high-level modes of your application. Think main menu, gameplay, loading screen, or pause menu. Each state can create, update, and destroy its own set of entities and resources. This makes it easy to manage transitions between different parts of your game.
 
-### Layer 4: Editor Framework
+#### Editor Framework
 
-The **Editor** layer mirrors the runtime but adds authoring capabilities. It's built using the same core systems and general modules, but extends them with editor-specific functionality.
+The **Editor** framework runs in parallel to Runtime but serves a different purpose: authoring and asset pipeline. It's built using the same core systems and general modules, but extends them with editor-specific functionality through .Editor extension modules.
 
 The editor provides tools for importing assets (like FBX models and PSD textures), editing scenes visually, creating materials with the shader graph, managing the project database, and building runtime packages for deployment.
 
@@ -174,17 +132,29 @@ Importantly, the editor uses the same entity-component system as the runtime. Wh
 
 Like the runtime, the editor supports plugins. You can add custom asset types, new editors, pipeline processors, and tools. Many of Traktor's built-in features are actually implemented as plugins, demonstrating the flexibility of the architecture.
 
-### Layer 5: Your Game
+#### Applications and Your Game
 
-The top layer is your game code and content. This includes:
+Applications come in three categories:
 
+**Runtime.App** - The main game launcher built on the Runtime framework. This is your actual game executable. It includes:
+- The Runtime framework's server architecture (render, physics, audio, etc.)
 - **Custom Components** that define game-specific behavior
 - **Lua Scripts** that implement gameplay logic
-- **Assets** created in the editor (scenes, materials, models, etc.)
-- **Pipeline Extensions** for custom asset processing
-- **Runtime Plugins** that extend the engine's capabilities
+- **Runtime Plugins** that extend engine capabilities
+- **Compiled Assets** loaded from the resource database
 
-Your game leverages all the layers below it. You don't have to think about Vulkan rendering or physics integration. Those concerns are handled by lower layers. You focus on what makes your game unique.
+**Editor Applications** - Built on the Editor framework to provide authoring tools:
+- **Editor.App** - The main content editor with visual scene editing, asset management, and shader graph tools
+- **Pipeline.App** - The asset build pipeline that processes source assets into runtime formats
+These don't run game logic but instead help you create and process content.
+
+**Standalone Applications** - Special-purpose tools that build on core systems (Layers 0-2) without using either framework:
+- **Run.App** - A lightweight launcher that can run scripts and execute database operations without the full Runtime overhead
+- **SolutionBuilder.App** - Generates build files (Visual Studio projects, makefiles) from module descriptions
+- **Database.Migrate.App** - Migrates project databases between versions
+These tools need only foundational modules (Core, utilities like Compress/Xml/Net, and core systems like Database/Script), not the higher-level game systems or framework infrastructure.
+
+Your game (Runtime.App) leverages all the layers below it. You don't have to think about Vulkan rendering or physics integration. Those concerns are handled by lower layers. You focus on what makes your game unique.
 
 ## How Data Flows Through the System
 
