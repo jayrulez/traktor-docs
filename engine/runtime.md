@@ -221,7 +221,7 @@ public:
 
 ### State Lifecycle
 
-![TODO: Diagram showing state lifecycle: Created → enter() → update loop (update → postUpdate → build → render) → leave() → Destroyed, with arrows showing transitions to other states]
+![Traktor State Lifecycle](../images/traktor-state-lifecycle.png)
 
 1. **enter()** - Initialize state resources
 2. **update()** - Update game logic (pre-physics)
