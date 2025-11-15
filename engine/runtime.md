@@ -13,7 +13,7 @@ The Runtime System is your game's conductor, orchestrating all the moving pieces
 
 Think of it like running a theater production: you have lighting technicians, sound engineers, actors, and stagehands. Each group does their job, but someone needs to coordinate them. Calling cues, managing scene changes, and ensuring everything happens in the right order. That's the Runtime System.
 
-![TODO: Diagram showing the runtime architecture with Application at the top, Servers in the middle (Render, Physics, Audio, Script, etc.), and States/Stages at the bottom]
+![Traktor Runtime Architecture](../images/traktor-runtime-architecture.png)
 
 ## How It All Fits Together
 
